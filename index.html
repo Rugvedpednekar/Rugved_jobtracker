@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CareerPath AI — Job Lifecycle Automator</title>
+  <title>JobTracker — Personal Dashboard</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,419 +15,502 @@
     rel="stylesheet"
   />
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/style.css" />
 
   <style>
     body {
       font-family: "Inter", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
     }
 
-    .tab-panel {
+    .section-panel {
       display: none;
     }
 
-    .tab-panel.active {
+    .section-panel.active {
       display: block;
     }
 
-    .glass {
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(10px);
+    .nav-btn.active {
+      background: #1d4ed8;
+      color: white;
     }
 
-    .soft-border {
-      border: 1px solid rgba(226, 232, 240, 0.9);
+    .board-scroll {
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
     }
 
-    .kanban-wrap {
+    .board-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(260px, 1fr));
+      grid-template-columns: repeat(5, minmax(260px, 1fr));
       gap: 1rem;
+      min-width: 1320px;
+    }
+
+    .job-card {
+      border: 1px solid #dbeafe;
+      border-left: 4px solid #2563eb;
+      background: white;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .stat-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .soft-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 24px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .field {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      padding: 12px 14px;
+      outline: none;
+      background: white;
+    }
+
+    .field:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      border-radius: 14px;
+      padding: 11px 16px;
+      font-weight: 700;
+    }
+
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-dark {
+      background: #0f172a;
+      color: white;
+      border-radius: 14px;
+      padding: 11px 16px;
+      font-weight: 700;
+    }
+
+    .btn-dark:hover {
+      background: #020617;
+    }
+
+    .btn-soft {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      border-radius: 14px;
+      padding: 11px 16px;
+      font-weight: 700;
+    }
+
+    .btn-soft:hover {
+      background: #dbeafe;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 9999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .chip-blue {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .chip-green {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .chip-yellow {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .chip-red {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .login-bg {
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.16), transparent 30%),
+        #f8fafc;
     }
 
     @media (max-width: 1024px) {
-      .kanban-wrap {
-        display: flex;
-        overflow-x: auto;
-        padding-bottom: 0.5rem;
+      .desktop-nav {
+        display: none;
       }
+    }
 
-      .kanban-wrap > .board-col {
-        min-width: 290px;
+    @media (min-width: 1025px) {
+      .mobile-nav {
+        display: none;
       }
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <div class="min-h-screen flex">
-    <!-- Sidebar -->
-    <aside class="hidden lg:flex w-72 flex-col border-r border-slate-200 bg-white/90 backdrop-blur sticky top-0 h-screen">
-      <div class="p-6 border-b border-slate-200">
-        <div class="flex items-center gap-3">
-          <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-            <i data-lucide="sparkles" class="w-5 h-5"></i>
+<body>
+  <!-- LOGIN PAGE -->
+  <section id="login-screen" class="min-h-screen login-bg flex items-center justify-center px-4">
+    <div class="w-full max-w-md">
+      <div class="soft-card p-8">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
+            <i data-lucide="briefcase-business" class="w-5 h-5"></i>
           </div>
           <div>
-            <h1 class="text-lg font-extrabold tracking-tight">CareerPath AI</h1>
-            <p class="text-sm text-slate-500">Personal Talent Agent</p>
+            <h1 class="text-2xl font-extrabold tracking-tight">JobTracker</h1>
+            <p class="text-sm text-slate-500">Private personal dashboard</p>
           </div>
         </div>
+
+        <div class="mb-6">
+          <h2 class="text-2xl font-extrabold">Sign in</h2>
+          <p class="text-sm text-slate-500 mt-2">
+            Access your personal job tracker, AI assistant, resume context, and application pipeline.
+          </p>
+        </div>
+
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold mb-2 text-slate-700">Email</label>
+            <input id="login-email" type="email" class="field" placeholder="you@example.com" required />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2 text-slate-700">Password</label>
+            <input id="login-password" type="password" class="field" placeholder="Enter your password" required />
+          </div>
+
+          <button type="submit" class="btn-primary w-full inline-flex items-center justify-center gap-2">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            Login
+          </button>
+        </form>
+
+        <p id="login-error" class="hidden mt-4 text-sm font-medium text-red-600"></p>
+
+        <div class="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600">
+          This dashboard is protected and only available after successful authentication.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- APP -->
+  <div id="app-shell" class="hidden min-h-screen">
+    <!-- TOP NAV -->
+    <header class="sticky top-0 z-40 bg-blue-700 text-white border-b border-blue-800">
+      <div class="px-4 md:px-6 xl:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1">
+            <span class="w-3 h-3 rounded-full bg-white/90 block"></span>
+            <span class="w-3 h-3 rounded-full bg-white/90 block"></span>
+          </div>
+          <div class="w-px h-7 bg-yellow-300/80 mx-1"></div>
+          <h1 class="text-xl font-extrabold tracking-tight">JobTracker</h1>
+        </div>
+
+        <nav class="desktop-nav h-full">
+          <div class="h-full flex items-center">
+            <button class="nav-btn active h-full px-5 border-l border-blue-500/70 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="tracker">
+              <i data-lucide="kanban-square" class="w-4 h-4"></i>
+              Tracker
+            </button>
+            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="jobs">
+              <i data-lucide="list" class="w-4 h-4"></i>
+              Jobs
+            </button>
+            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="profile">
+              <i data-lucide="user-round" class="w-4 h-4"></i>
+              Profile
+            </button>
+            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="docs">
+              <i data-lucide="folder" class="w-4 h-4"></i>
+              Docs
+            </button>
+            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="settings">
+              <i data-lucide="settings" class="w-4 h-4"></i>
+              Settings
+            </button>
+            <button id="logout-btn" class="h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium hover:bg-blue-800">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </nav>
+
+        <button id="mobile-menu-btn" class="mobile-nav inline-flex items-center justify-center rounded-xl p-2 hover:bg-blue-800">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
       </div>
 
-      <nav class="p-4 space-y-2">
-        <button class="nav-link active w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left bg-indigo-50 text-indigo-700 font-semibold" data-tab="dashboard">
-          <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-          Dashboard
-        </button>
+      <div id="mobile-menu" class="mobile-nav hidden border-t border-blue-500/60 bg-blue-700">
+        <div class="px-4 py-3 grid grid-cols-2 gap-2">
+          <button class="nav-btn active rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 bg-blue-800" data-section="tracker">
+            <i data-lucide="kanban-square" class="w-4 h-4"></i> Tracker
+          </button>
+          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="jobs">
+            <i data-lucide="list" class="w-4 h-4"></i> Jobs
+          </button>
+          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="profile">
+            <i data-lucide="user-round" class="w-4 h-4"></i> Profile
+          </button>
+          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="docs">
+            <i data-lucide="folder" class="w-4 h-4"></i> Docs
+          </button>
+          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="settings">
+            <i data-lucide="settings" class="w-4 h-4"></i> Settings
+          </button>
+          <button id="mobile-logout-btn" class="rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800">
+            <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+          </button>
+        </div>
+      </div>
+    </header>
 
-        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="pipeline">
-          <i data-lucide="briefcase-business" class="w-5 h-5"></i>
-          Pipeline
-        </button>
-
-        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="recommendations">
-          <i data-lucide="search-code" class="w-5 h-5"></i>
-          Job Match Sync
-        </button>
-
-        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="profile">
-          <i data-lucide="file-text" class="w-5 h-5"></i>
-          Resume Profile
-        </button>
-
-        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="inbox">
-          <i data-lucide="mail-search" class="w-5 h-5"></i>
-          Email Status Parser
-        </button>
-
-        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="settings">
-          <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
-          Settings
-        </button>
-      </nav>
-
-      <div class="mt-auto p-4 border-t border-slate-200">
-        <div id="user-profile" class="hidden items-center gap-3 rounded-2xl bg-slate-50 p-3">
-          <img id="user-avatar" class="w-10 h-10 rounded-full object-cover" alt="User avatar" />
-          <div class="min-w-0">
-            <p id="user-name" class="text-sm font-semibold truncate">Signed in</p>
-            <p class="text-xs text-slate-500">Google account linked</p>
+    <main class="px-4 md:px-6 xl:px-8 py-6">
+      <!-- TRACKER -->
+      <section id="tracker" class="section-panel active space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <p class="text-sm font-medium text-slate-500">Overview</p>
+            <h2 class="text-3xl font-extrabold tracking-tight">Application Tracker</h2>
           </div>
-          <button id="logout-btn" class="ml-auto text-slate-500 hover:text-red-600">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
+
+          <div class="flex flex-wrap gap-3">
+            <button id="open-add-job" class="btn-primary inline-flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              Add Job
+            </button>
+            <button id="refresh-dashboard-btn" class="btn-soft inline-flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="stat-card">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Wishlist</p>
+            <p id="wishlist-count" class="text-3xl font-extrabold mt-2">0</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Applied</p>
+            <p id="applied-count" class="text-3xl font-extrabold mt-2">0</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Interview</p>
+            <p id="interview-count" class="text-3xl font-extrabold mt-2">0</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Offered</p>
+            <p id="offered-count" class="text-3xl font-extrabold mt-2">0</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Accepted</p>
+            <p id="accepted-count" class="text-3xl font-extrabold mt-2">0</p>
+          </div>
+        </div>
+
+        <div class="soft-card p-5">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5">
+            <div>
+              <h3 class="text-xl font-extrabold">Kanban Board</h3>
+              <p class="text-sm text-slate-500">Track your applications from wishlist to accepted.</p>
+            </div>
+            <p class="text-sm text-slate-500">Drag-and-drop can be added later. For now, jobs can be updated from the Jobs section.</p>
+          </div>
+
+          <div class="board-scroll">
+            <div class="board-grid">
+              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h4 class="font-extrabold">Wishlist</h4>
+                  <span id="wishlist-badge" class="chip chip-blue">0</span>
+                </div>
+                <div id="wishlist-column" class="space-y-3"></div>
+              </div>
+
+              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h4 class="font-extrabold">Applied</h4>
+                  <span id="applied-badge" class="chip chip-blue">0</span>
+                </div>
+                <div id="applied-column" class="space-y-3"></div>
+              </div>
+
+              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h4 class="font-extrabold">Interview</h4>
+                  <span id="interview-badge" class="chip chip-yellow">0</span>
+                </div>
+                <div id="interview-column" class="space-y-3"></div>
+              </div>
+
+              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h4 class="font-extrabold">Offered</h4>
+                  <span id="offered-badge" class="chip chip-green">0</span>
+                </div>
+                <div id="offered-column" class="space-y-3"></div>
+              </div>
+
+              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h4 class="font-extrabold">Accepted</h4>
+                  <span id="accepted-badge" class="chip chip-green">0</span>
+                </div>
+                <div id="accepted-column" class="space-y-3"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="xl:col-span-2 soft-card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-xl font-extrabold">Recent Jobs</h3>
+                <p class="text-sm text-slate-500">Latest entries from your tracked applications.</p>
+              </div>
+            </div>
+            <div id="recent-jobs-list" class="space-y-3">
+              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
+                No jobs added yet.
+              </div>
+            </div>
+          </div>
+
+          <div class="soft-card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-xl font-extrabold">AI Assistant</h3>
+                <p class="text-sm text-slate-500">Ask about your jobs, resume, or progress.</p>
+              </div>
+              <i data-lucide="sparkles" class="w-5 h-5 text-slate-400"></i>
+            </div>
+
+            <div id="chat-messages" class="rounded-2xl bg-slate-50 border border-slate-200 p-4 h-72 overflow-y-auto space-y-3">
+              <div class="rounded-2xl bg-white border border-slate-200 p-3 text-sm text-slate-700">
+                Hi Rugved — ask me something like <span class="font-semibold">“How many jobs have I applied till now?”</span>
+              </div>
+            </div>
+
+            <form id="chat-form" class="mt-4 flex gap-2">
+              <input id="chat-input" type="text" class="field" placeholder="Ask your dashboard AI..." />
+              <button class="btn-primary inline-flex items-center justify-center" type="submit">
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- JOBS -->
+      <section id="jobs" class="section-panel space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h2 class="text-3xl font-extrabold tracking-tight">Jobs</h2>
+            <p class="text-slate-500">Search, filter, and manage all tracked jobs.</p>
+          </div>
+
+          <button id="jobs-add-btn" class="btn-primary inline-flex items-center gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Add Job
           </button>
         </div>
 
-        <button id="login-btn" class="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition">
-          <i data-lucide="chrome" class="w-4 h-4"></i>
-          Continue with Google
-        </button>
-      </div>
-    </aside>
-
-    <!-- Main -->
-    <div class="flex-1 min-w-0">
-      <!-- Topbar -->
-      <header class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200">
-        <div class="px-4 md:px-6 xl:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p class="text-sm text-slate-500 font-medium">Context-Aware Job Lifecycle Automator</p>
-            <h2 id="page-title" class="text-2xl md:text-3xl font-extrabold tracking-tight">
-              Dashboard
-            </h2>
-          </div>
-
-          <div class="flex flex-col sm:flex-row gap-3">
-            <button id="sync-btn" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 text-white px-4 py-3 font-semibold hover:bg-indigo-700 transition shadow-sm">
+        <div class="soft-card p-5">
+          <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <input id="jobs-search-input" class="field md:col-span-2" placeholder="Search company or role..." />
+            <select id="jobs-status-filter" class="field">
+              <option value="all">All statuses</option>
+              <option value="Wishlist">Wishlist</option>
+              <option value="Applied">Applied</option>
+              <option value="Interview">Interview</option>
+              <option value="Offered">Offered</option>
+              <option value="Accepted">Accepted</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            <input id="jobs-company-filter" class="field" placeholder="Filter by company..." />
+            <button id="jobs-refresh-btn" class="btn-soft inline-flex items-center justify-center gap-2">
               <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-              Morning Sync
-            </button>
-
-            <button id="add-btn" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition shadow-sm">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              Quick Add Job
+              Refresh
             </button>
           </div>
         </div>
-      </header>
 
-      <main class="px-4 md:px-6 xl:px-8 py-6 space-y-8">
-        <!-- Dashboard -->
-        <section id="dashboard" class="tab-panel active space-y-8">
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div class="xl:col-span-2 space-y-6">
-              <div class="rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-slate-900 text-white p-6 md:p-8 shadow-lg">
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                  <div class="max-w-2xl">
-                    <p class="text-indigo-100 text-sm font-semibold tracking-wide uppercase">
-                      AI Job Search Control Center
-                    </p>
-                    <h3 class="text-2xl md:text-4xl font-extrabold leading-tight mt-2">
-                      Turn your resume into a live interview pipeline.
-                    </h3>
-                    <p class="text-indigo-100 mt-3 text-sm md:text-base leading-7">
-                      Parse your resume, discover fresh opportunities, track applications,
-                      and detect interview signals from recruiter emails in one place.
-                    </p>
-                  </div>
-
-                  <div class="grid grid-cols-2 gap-3 min-w-[260px]">
-                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
-                      <p class="text-xs uppercase tracking-wide text-indigo-100">Last Sync</p>
-                      <p id="last-sync-label" class="text-lg font-bold mt-1">Never</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
-                      <p class="text-xs uppercase tracking-wide text-indigo-100">Profile</p>
-                      <p id="profile-status-label" class="text-lg font-bold mt-1">Not Parsed</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
-                      <p class="text-xs uppercase tracking-wide text-indigo-100">Keywords</p>
-                      <p id="keyword-count-label" class="text-lg font-bold mt-1">0</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
-                      <p class="text-xs uppercase tracking-wide text-indigo-100">Tracked Jobs</p>
-                      <p id="job-count-label" class="text-lg font-bold mt-1">0</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div id="stats-container" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="rounded-2xl bg-white border border-slate-200 p-5">
-                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Applied</p>
-                  <p class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
-                </div>
-                <div class="rounded-2xl bg-white border border-slate-200 p-5">
-                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Interviewing</p>
-                  <p class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
-                </div>
-                <div class="rounded-2xl bg-white border border-slate-200 p-5">
-                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Offers</p>
-                  <p class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
-                </div>
-                <div class="rounded-2xl bg-white border border-slate-200 p-5">
-                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Recent Matches</p>
-                  <p id="match-count-label" class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
-                </div>
-              </div>
-
-              <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
-                <div class="p-6 border-b border-slate-200 flex items-center justify-between gap-4">
-                  <div>
-                    <h3 class="text-lg font-extrabold">Pipeline Snapshot</h3>
-                    <p class="text-sm text-slate-500">A Kanban view of your current job lifecycle.</p>
-                  </div>
-                  <button class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 nav-jump" data-tab="pipeline">
-                    Open full board
-                  </button>
-                </div>
-
-                <div class="p-6">
-                  <div id="pipeline-preview" class="kanban-wrap">
-                    <div class="board-col rounded-2xl bg-slate-100 p-4">
-                      <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs uppercase font-bold text-slate-500">Applied</span>
-                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
-                      </div>
-                    </div>
-                    <div class="board-col rounded-2xl bg-slate-100 p-4">
-                      <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs uppercase font-bold text-slate-500">Interview</span>
-                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
-                      </div>
-                    </div>
-                    <div class="board-col rounded-2xl bg-slate-100 p-4">
-                      <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs uppercase font-bold text-slate-500">Offer</span>
-                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
-                      </div>
-                    </div>
-                    <div class="board-col rounded-2xl bg-slate-100 p-4">
-                      <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs uppercase font-bold text-slate-500">Rejected</span>
-                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="space-y-6">
-              <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <h3 class="text-lg font-extrabold">Morning Sync</h3>
-                    <p class="text-sm text-slate-500">Real-time market scan and profile-aware matching.</p>
-                  </div>
-                  <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
-                    <i data-lucide="radar" class="w-5 h-5"></i>
-                  </div>
-                </div>
-
-                <div class="mt-5 space-y-4">
-                  <div class="rounded-2xl border border-slate-200 p-4">
-                    <p class="text-xs uppercase font-bold text-slate-500">Step 1</p>
-                    <p class="font-semibold mt-1">Load resume profile + custom keywords</p>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 p-4">
-                    <p class="text-xs uppercase font-bold text-slate-500">Step 2</p>
-                    <p class="font-semibold mt-1">Search jobs posted in the last 24 hours</p>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 p-4">
-                    <p class="text-xs uppercase font-bold text-slate-500">Step 3</p>
-                    <p class="font-semibold mt-1">Generate transparent match reasons</p>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 p-4">
-                    <p class="text-xs uppercase font-bold text-slate-500">Step 4</p>
-                    <p class="font-semibold mt-1">Quick add recommendations to the board</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <h3 class="text-lg font-extrabold">Latest AI Insight</h3>
-                    <p class="text-sm text-slate-500">Why this system recommends certain jobs.</p>
-                  </div>
-                  <i data-lucide="brain-circuit" class="w-5 h-5 text-slate-400"></i>
-                </div>
-                <div id="insight-box" class="mt-4 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600 leading-7">
-                  No sync has run yet. Once recommendations are generated, their match reasoning will appear here.
-                </div>
-              </div>
+        <div class="soft-card p-5">
+          <div id="jobs-list" class="space-y-4">
+            <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
+              No tracked jobs yet.
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <!-- Pipeline -->
-        <section id="pipeline" class="tab-panel space-y-6">
-          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <!-- PROFILE -->
+      <section id="profile" class="section-panel space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h2 class="text-3xl font-extrabold tracking-tight">Profile</h2>
+            <p class="text-slate-500">Your resume context, parsed skills, and target profile.</p>
+          </div>
+
+          <button id="analyze-resume-top-btn" class="btn-primary inline-flex items-center gap-2">
+            <i data-lucide="scan-text" class="w-4 h-4"></i>
+            Analyze Resume
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div class="soft-card p-6">
+            <h3 class="text-xl font-extrabold mb-2">Resume Text</h3>
+            <p class="text-sm text-slate-500 mb-4">Paste your latest resume so the AI can use it as context.</p>
+
+            <textarea
+              id="resume-box"
+              class="field min-h-[420px] font-mono text-sm"
+              placeholder="Paste your resume text here..."
+            ></textarea>
+
+            <div class="mt-4 flex flex-col sm:flex-row gap-3">
+              <button id="analyze-resume-btn" class="btn-primary">Analyze Resume</button>
+              <button id="save-resume-btn" class="btn-dark">Save Resume</button>
+            </div>
+          </div>
+
+          <div class="soft-card p-6 space-y-6">
             <div>
-              <h3 class="text-2xl font-extrabold">Application Pipeline</h3>
-              <p class="text-slate-500">Manage the lifecycle from applied to offer.</p>
+              <h3 class="text-xl font-extrabold mb-2">Parsed Profile</h3>
+              <p class="text-sm text-slate-500">Structured output that your AI uses.</p>
             </div>
 
-            <div class="flex flex-wrap gap-3">
-              <input
-                id="job-search-input"
-                type="text"
-                placeholder="Search company or role..."
-                class="w-full sm:w-72 rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500"
-              />
-              <select id="job-filter-status" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
-                <option value="all">All statuses</option>
-                <option value="Applied">Applied</option>
-                <option value="Interview">Interview</option>
-                <option value="Offer">Offer</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-            </div>
-          </div>
-
-          <div id="board" class="kanban-wrap">
-            <!-- JS renders columns here -->
-          </div>
-        </section>
-
-        <!-- Recommendations -->
-        <section id="recommendations" class="tab-panel space-y-6">
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div class="xl:col-span-2 rounded-3xl bg-white border border-slate-200 shadow-sm">
-              <div class="p-6 border-b border-slate-200 flex items-start justify-between gap-4">
-                <div>
-                  <h3 class="text-2xl font-extrabold">Job Match Sync</h3>
-                  <p class="text-slate-500">Fresh opportunities grounded against your profile and keywords.</p>
-                </div>
-                <button id="sync-btn-secondary" class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 text-white px-4 py-3 font-semibold hover:bg-indigo-700 transition">
-                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                  Run Sync
-                </button>
-              </div>
-
-              <div id="recommendations-list" class="p-6 space-y-4">
-                <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
-                  No recommendations yet. Run a sync to fetch relevant live postings.
-                </div>
-              </div>
-            </div>
-
-            <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm space-y-5">
-              <div>
-                <h3 class="text-lg font-extrabold">Search Keywords</h3>
-                <p class="text-sm text-slate-500">Guide the sync toward your target roles and domains.</p>
-              </div>
-
-              <div class="space-y-3">
-                <label class="block text-sm font-semibold text-slate-700">Target keywords</label>
-                <textarea
-                  id="keyword-box"
-                  rows="8"
-                  placeholder="Example:
-Data Analyst
-Business Intelligence
-Python
-SQL
-Tableau
-OPT Sponsorship"
-                  class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500"
-                ></textarea>
-              </div>
-
-              <button id="save-keywords-btn" class="w-full rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition">
-                Save Keywords
-              </button>
-
-              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                <p class="text-xs uppercase tracking-wide font-bold text-slate-500">How matching works</p>
-                <p class="text-sm text-slate-600 leading-7 mt-2">
-                  The AI compares job titles, skills, seniority, domain alignment, and your custom keywords,
-                  then explains why a posting fits you with a match reason.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Profile -->
-        <section id="profile" class="tab-panel space-y-6">
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
-              <div class="p-6 border-b border-slate-200">
-                <h3 class="text-2xl font-extrabold">Resume Input</h3>
-                <p class="text-slate-500">Paste your raw resume and let AI extract structured entities.</p>
-              </div>
-
-              <div class="p-6 space-y-4">
-                <textarea
-                  id="resume-box"
-                  class="w-full h-[420px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 font-mono text-sm outline-none focus:border-indigo-500"
-                  placeholder="Paste your resume text here..."
-                ></textarea>
-
-                <div class="flex flex-col sm:flex-row gap-3">
-                  <button id="analyze-resume-btn" class="rounded-2xl bg-indigo-600 text-white px-5 py-3 font-semibold hover:bg-indigo-700 transition">
-                    Analyze Resume
-                  </button>
-                  <button id="save-resume-btn" class="rounded-2xl bg-slate-900 text-white px-5 py-3 font-semibold hover:bg-slate-800 transition">
-                    Save Resume
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
-              <div class="p-6 border-b border-slate-200 flex items-center justify-between gap-4">
-                <div>
-                  <h3 class="text-2xl font-extrabold">Structured Resume Profile</h3>
-                  <p class="text-slate-500">Entity extraction output used for matching.</p>
-                </div>
-                <i data-lucide="file-json-2" class="w-5 h-5 text-slate-400"></i>
-              </div>
-
-              <div class="p-6">
-                <pre id="parsed-profile-output" class="rounded-2xl bg-slate-950 text-slate-100 p-5 text-sm overflow-auto min-h-[420px] whitespace-pre-wrap">{
+            <pre id="parsed-profile-output" class="rounded-2xl bg-slate-950 text-slate-100 p-5 text-sm overflow-auto min-h-[260px] whitespace-pre-wrap">{
   "skills": [],
   "roles": [],
   "experienceLevel": "",
@@ -436,278 +518,299 @@ OPT Sponsorship"
   "locations": [],
   "education": []
 }</pre>
-              </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">Keywords</label>
+              <textarea
+                id="keyword-box"
+                rows="8"
+                class="field"
+                placeholder="Example:
+Data Analyst
+Python
+SQL
+Business Intelligence
+OPT Sponsorship"
+              ></textarea>
             </div>
+
+            <button id="save-keywords-btn" class="btn-soft">Save Keywords</button>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <!-- Inbox -->
-        <section id="inbox" class="tab-panel space-y-6">
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
-              <div class="p-6 border-b border-slate-200">
-                <h3 class="text-2xl font-extrabold">Recruiter Email Parser</h3>
-                <p class="text-slate-500">Detect lifecycle state changes from natural language.</p>
-              </div>
+      <!-- DOCS -->
+      <section id="docs" class="section-panel space-y-6">
+        <div>
+          <h2 class="text-3xl font-extrabold tracking-tight">Documents</h2>
+          <p class="text-slate-500">Cover letters, resume generation, and saved material.</p>
+        </div>
 
-              <div class="p-6 space-y-4">
-                <textarea
-                  id="email-parser-input"
-                  rows="16"
-                  class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm outline-none focus:border-indigo-500"
-                  placeholder="Paste recruiter email text here...
-
-Example:
-We'd like to move forward with an interview for the Data Analyst role..."
-                ></textarea>
-
-                <div class="flex flex-col sm:flex-row gap-3">
-                  <button id="parse-email-btn" class="rounded-2xl bg-indigo-600 text-white px-5 py-3 font-semibold hover:bg-indigo-700 transition">
-                    Parse Email Status
-                  </button>
-                  <select id="email-job-link" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
-                    <option value="">Link result to tracked job</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
-              <div class="p-6 border-b border-slate-200">
-                <h3 class="text-2xl font-extrabold">Detected State</h3>
-                <p class="text-slate-500">Natural language understanding output.</p>
-              </div>
-
-              <div class="p-6 space-y-4">
-                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-5">
-                  <p class="text-xs uppercase tracking-wide font-bold text-slate-500">Detected Status</p>
-                  <p id="parsed-email-status" class="text-2xl font-extrabold mt-2 text-slate-900">No signal detected</p>
-                </div>
-
-                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-5">
-                  <p class="text-xs uppercase tracking-wide font-bold text-slate-500">Reasoning</p>
-                  <p id="parsed-email-reason" class="text-sm text-slate-600 leading-7 mt-2">
-                    Paste an email and parse it to extract lifecycle intent such as Interview, Rejection, Offer, or Follow-up.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Settings -->
-        <section id="settings" class="tab-panel space-y-6">
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm space-y-5">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div class="soft-card p-6">
+            <div class="flex items-center justify-between gap-4">
               <div>
-                <h3 class="text-2xl font-extrabold">System Settings</h3>
-                <p class="text-slate-500">Control sync behavior and client-side preferences.</p>
+                <h3 class="text-2xl font-extrabold">Cover Letters</h3>
+                <p class="text-sm text-slate-500 mt-2">Generate or upload cover letters.</p>
               </div>
-
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-semibold text-slate-700 mb-2">Sync window</label>
-                  <select id="sync-window" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
-                    <option value="24">Jobs posted in last 24 hours</option>
-                    <option value="48">Jobs posted in last 48 hours</option>
-                    <option value="72">Jobs posted in last 72 hours</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-semibold text-slate-700 mb-2">Preferred locations</label>
-                  <input
-                    id="preferred-location"
-                    type="text"
-                    placeholder="Hartford, CT / Remote / New York"
-                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-semibold text-slate-700 mb-2">Notes</label>
-                  <textarea
-                    id="user-notes"
-                    rows="5"
-                    placeholder="Anything the AI should prioritize..."
-                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500"
-                  ></textarea>
-                </div>
+              <div class="flex gap-2">
+                <button class="btn-soft">Upload</button>
+                <button class="btn-primary">Generate</button>
               </div>
-
-              <button id="save-settings-btn" class="w-full rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition">
-                Save Preferences
-              </button>
             </div>
 
-            <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm space-y-5">
-              <div>
-                <h3 class="text-2xl font-extrabold">Architecture Summary</h3>
-                <p class="text-slate-500">What this product is designed to do.</p>
-              </div>
-
-              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-5 space-y-4 text-sm text-slate-600 leading-7">
-                <p>
-                  <span class="font-semibold text-slate-800">Persistence Layer:</span>
-                  Firestore stores resume profile, keywords, applications, and sync metadata per anonymous user.
-                </p>
-                <p>
-                  <span class="font-semibold text-slate-800">Intelligence Layer:</span>
-                  Gemini parses resume text, matches live postings, and detects lifecycle transitions from recruiter emails.
-                </p>
-                <p>
-                  <span class="font-semibold text-slate-800">Presentation Layer:</span>
-                  A minimalist Kanban-based UI reduces cognitive load while keeping the job search stateful and transparent.
-                </p>
-              </div>
+            <div class="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-6 text-slate-500 text-sm">
+              Document management section ready for backend integration.
             </div>
           </div>
-        </section>
-      </main>
-    </div>
+
+          <div class="soft-card p-6">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <h3 class="text-2xl font-extrabold">CV / Resume</h3>
+                <p class="text-sm text-slate-500 mt-2">Store and generate resume versions.</p>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn-soft">Upload</button>
+                <button class="btn-primary">Generate</button>
+              </div>
+            </div>
+
+            <div class="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-6 text-slate-500 text-sm">
+              Resume document area ready for future enhancement.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="settings" class="section-panel space-y-6">
+        <div>
+          <h2 class="text-3xl font-extrabold tracking-tight">Settings</h2>
+          <p class="text-slate-500">Personalize your dashboard and AI preferences.</p>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div class="soft-card p-6 space-y-5">
+            <div>
+              <h3 class="text-2xl font-extrabold">System Preferences</h3>
+              <p class="text-sm text-slate-500 mt-2">Control how the AI behaves on your dashboard.</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">Sync window</label>
+              <select id="sync-window" class="field">
+                <option value="24">Jobs posted in last 24 hours</option>
+                <option value="48">Jobs posted in last 48 hours</option>
+                <option value="72">Jobs posted in last 72 hours</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">Preferred location</label>
+              <input id="preferred-location" type="text" class="field" placeholder="Hartford, CT / Remote / NYC" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">AI notes</label>
+              <textarea id="user-notes" rows="6" class="field" placeholder="Anything the AI should prioritize..."></textarea>
+            </div>
+
+            <button id="save-settings-btn" class="btn-dark">Save Settings</button>
+          </div>
+
+          <div class="soft-card p-6 space-y-5">
+            <div>
+              <h3 class="text-2xl font-extrabold">Recruiter Email Parser</h3>
+              <p class="text-sm text-slate-500 mt-2">Update job status using raw recruiter emails.</p>
+            </div>
+
+            <textarea
+              id="email-parser-input"
+              rows="12"
+              class="field"
+              placeholder="Paste recruiter email text here..."
+            ></textarea>
+
+            <select id="email-job-link" class="field">
+              <option value="">Link parsed status to tracked job</option>
+            </select>
+
+            <button id="parse-email-btn" class="btn-primary">Parse Email</button>
+
+            <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wide font-bold text-slate-500">Detected Status</p>
+              <p id="parsed-email-status" class="text-2xl font-extrabold mt-2">No signal detected</p>
+              <p id="parsed-email-reason" class="text-sm text-slate-600 mt-3 leading-6">
+                Paste an email and parse it to detect interview, offer, rejection, or other status changes.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- Mobile nav -->
-  <nav class="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">
-    <div class="grid grid-cols-5">
-      <button class="mobile-nav-link active flex flex-col items-center justify-center gap-1 py-3 text-indigo-600 text-xs font-semibold" data-tab="dashboard">
-        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-        Home
-      </button>
-      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="pipeline">
-        <i data-lucide="briefcase-business" class="w-4 h-4"></i>
-        Jobs
-      </button>
-      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="recommendations">
-        <i data-lucide="search-code" class="w-4 h-4"></i>
-        Sync
-      </button>
-      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="profile">
-        <i data-lucide="file-text" class="w-4 h-4"></i>
-        Resume
-      </button>
-      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="inbox">
-        <i data-lucide="mail-search" class="w-4 h-4"></i>
-        Email
-      </button>
-    </div>
-  </nav>
-
-  <!-- Add Job Modal -->
-  <div id="add-modal" class="hidden fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm p-4">
+  <!-- ADD JOB MODAL -->
+  <div id="add-job-modal" class="hidden fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm p-4">
     <div class="min-h-full flex items-center justify-center">
-      <div class="w-full max-w-xl rounded-3xl bg-white border border-slate-200 shadow-2xl">
+      <div class="w-full max-w-2xl rounded-[28px] bg-white border border-slate-200 shadow-2xl">
         <div class="p-6 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h3 class="text-xl font-extrabold">Quick Add Job</h3>
-            <p class="text-sm text-slate-500">Manually add a company and role into your pipeline.</p>
+            <h3 class="text-2xl font-extrabold">Add Job</h3>
+            <p class="text-sm text-slate-500 mt-1">Add a company and role to your tracker.</p>
           </div>
-          <button id="close-modal" class="rounded-xl p-2 hover:bg-slate-100 text-slate-500">
+          <button id="close-add-job-modal" class="rounded-xl p-2 hover:bg-slate-100">
             <i data-lucide="x" class="w-5 h-5"></i>
           </button>
         </div>
 
         <form id="add-job-form" class="p-6 space-y-4">
-          <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-2">Company</label>
-            <input id="job-company" type="text" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500" placeholder="Amazon" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Company</label>
+              <input id="job-company" class="field" placeholder="Amazon" required />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">Role</label>
+              <input id="job-role" class="field" placeholder="Data Analyst" required />
+            </div>
           </div>
 
-          <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-2">Role</label>
-            <input id="job-role" type="text" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500" placeholder="Data Analyst" />
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Status</label>
+              <select id="job-status" class="field">
+                <option value="Wishlist">Wishlist</option>
+                <option value="Applied">Applied</option>
+                <option value="Interview">Interview</option>
+                <option value="Offered">Offered</option>
+                <option value="Accepted">Accepted</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">Date</label>
+              <input id="job-date" type="date" class="field" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">Field</label>
+              <input id="job-field" class="field" placeholder="Tech" />
+            </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">Status</label>
-              <select id="job-status" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
-                <option value="Applied">Applied</option>
-                <option value="Interview">Interview</option>
-                <option value="Offer">Offer</option>
-                <option value="Rejected">Rejected</option>
-              </select>
+              <label class="block text-sm font-semibold mb-2">Salary</label>
+              <input id="job-salary" class="field" placeholder="$80,000 - $100,000" />
             </div>
-
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">Application Link</label>
-              <input id="job-link" type="url" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500" placeholder="https://..." />
+              <label class="block text-sm font-semibold mb-2">Sponsor</label>
+              <input id="job-sponsor" class="field" placeholder="Yes / No / Unknown" />
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-2">Notes</label>
-            <textarea id="job-notes" rows="4" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500" placeholder="Optional notes, recruiter info, salary, etc."></textarea>
+            <label class="block text-sm font-semibold mb-2">Link</label>
+            <input id="job-link" type="url" class="field" placeholder="https://..." />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2">Notes</label>
+            <textarea id="job-notes" rows="4" class="field" placeholder="Optional notes..."></textarea>
           </div>
 
           <div class="flex flex-col sm:flex-row gap-3 pt-2">
-            <button type="submit" class="flex-1 rounded-2xl bg-indigo-600 text-white px-4 py-3 font-semibold hover:bg-indigo-700 transition">
-              Save Job
-            </button>
-            <button type="button" id="cancel-modal" class="flex-1 rounded-2xl bg-slate-100 text-slate-800 px-4 py-3 font-semibold hover:bg-slate-200 transition">
-              Cancel
-            </button>
+            <button type="submit" class="btn-primary flex-1">Save Job</button>
+            <button type="button" id="cancel-add-job-modal" class="btn-soft flex-1">Cancel</button>
           </div>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- Toast -->
+  <!-- TOAST -->
   <div id="toast" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[60] rounded-full bg-slate-900 text-white px-5 py-3 text-sm font-semibold shadow-xl">
     Saved
   </div>
 
   <script>
-    const pageTitle = document.getElementById("page-title");
-    const navLinks = document.querySelectorAll(".nav-link, .mobile-nav-link, .nav-jump");
-    const panels = document.querySelectorAll(".tab-panel");
+    const loginScreen = document.getElementById("login-screen");
+    const appShell = document.getElementById("app-shell");
+    const sectionPanels = document.querySelectorAll(".section-panel");
+    const navButtons = document.querySelectorAll(".nav-btn");
+    const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+    const mobileMenu = document.getElementById("mobile-menu");
 
-    function activateTab(tabId) {
-      panels.forEach(panel => panel.classList.remove("active"));
-      document.getElementById(tabId)?.classList.add("active");
+    function activateSection(sectionId) {
+      sectionPanels.forEach((panel) => panel.classList.remove("active"));
+      document.getElementById(sectionId)?.classList.add("active");
 
-      document.querySelectorAll(".nav-link").forEach(btn => {
-        btn.classList.remove("active", "bg-indigo-50", "text-indigo-700");
-        btn.classList.add("text-slate-700");
-        if (btn.dataset.tab === tabId) {
-          btn.classList.add("active", "bg-indigo-50", "text-indigo-700");
+      navButtons.forEach((btn) => {
+        const active = btn.dataset.section === sectionId;
+        btn.classList.toggle("active", active);
+        if (active) {
+          btn.classList.add("bg-blue-800");
+        } else {
+          btn.classList.remove("bg-blue-800");
         }
       });
 
-      document.querySelectorAll(".mobile-nav-link").forEach(btn => {
-        btn.classList.remove("active", "text-indigo-600");
-        btn.classList.add("text-slate-500");
-        if (btn.dataset.tab === tabId) {
-          btn.classList.add("active", "text-indigo-600");
-          btn.classList.remove("text-slate-500");
-        }
-      });
+      if (mobileMenu) {
+        mobileMenu.classList.add("hidden");
+      }
 
-      const titleMap = {
-        dashboard: "Dashboard",
-        pipeline: "Application Pipeline",
-        recommendations: "Job Match Sync",
-        profile: "Resume Profile",
-        inbox: "Email Status Parser",
-        settings: "Settings"
-      };
-
-      pageTitle.textContent = titleMap[tabId] || "Dashboard";
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    navLinks.forEach(btn => {
-      btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+    navButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.section;
+        if (target) activateSection(target);
+      });
     });
 
-    document.getElementById("cancel-modal")?.addEventListener("click", () => {
-      document.getElementById("add-modal").classList.add("hidden");
+    mobileMenuBtn?.addEventListener("click", () => {
+      mobileMenu.classList.toggle("hidden");
+    });
+
+    function openApp() {
+      loginScreen.classList.add("hidden");
+      appShell.classList.remove("hidden");
+    }
+
+    function showLogin() {
+      appShell.classList.add("hidden");
+      loginScreen.classList.remove("hidden");
+    }
+
+    const addJobModal = document.getElementById("add-job-modal");
+    const openAddButtons = [
+      document.getElementById("open-add-job"),
+      document.getElementById("jobs-add-btn")
+    ];
+
+    openAddButtons.forEach((btn) => {
+      btn?.addEventListener("click", () => {
+        addJobModal.classList.remove("hidden");
+      });
+    });
+
+    document.getElementById("close-add-job-modal")?.addEventListener("click", () => {
+      addJobModal.classList.add("hidden");
+    });
+
+    document.getElementById("cancel-add-job-modal")?.addEventListener("click", () => {
+      addJobModal.classList.add("hidden");
     });
 
     lucide.createIcons();
+
+    // Let script.js decide actual auth state later.
+    // Temporary default:
+    // showLogin();
   </script>
 
-  <script src="script.js"></script>
+  <script src="/script.js"></script>
 </body>
 </html>
