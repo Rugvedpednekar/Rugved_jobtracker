@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CareerPath AI — Job Lifecycle Automator</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .glass {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+    }
+
+    .soft-border {
+      border: 1px solid rgba(226, 232, 240, 0.9);
+    }
+
+    .kanban-wrap {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+
+    @media (max-width: 1024px) {
+      .kanban-wrap {
+        display: flex;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+      }
+
+      .kanban-wrap > .board-col {
+        min-width: 290px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="hidden lg:flex w-72 flex-col border-r border-slate-200 bg-white/90 backdrop-blur sticky top-0 h-screen">
+      <div class="p-6 border-b border-slate-200">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-extrabold tracking-tight">CareerPath AI</h1>
+            <p class="text-sm text-slate-500">Personal Talent Agent</p>
+          </div>
+        </div>
+      </div>
+
+      <nav class="p-4 space-y-2">
+        <button class="nav-link active w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left bg-indigo-50 text-indigo-700 font-semibold" data-tab="dashboard">
+          <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+          Dashboard
+        </button>
+
+        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="pipeline">
+          <i data-lucide="briefcase-business" class="w-5 h-5"></i>
+          Pipeline
+        </button>
+
+        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="recommendations">
+          <i data-lucide="search-code" class="w-5 h-5"></i>
+          Job Match Sync
+        </button>
+
+        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="profile">
+          <i data-lucide="file-text" class="w-5 h-5"></i>
+          Resume Profile
+        </button>
+
+        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="inbox">
+          <i data-lucide="mail-search" class="w-5 h-5"></i>
+          Email Status Parser
+        </button>
+
+        <button class="nav-link w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left hover:bg-slate-100 text-slate-700 font-semibold" data-tab="settings">
+          <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+          Settings
+        </button>
+      </nav>
+
+      <div class="mt-auto p-4 border-t border-slate-200">
+        <div id="user-profile" class="hidden items-center gap-3 rounded-2xl bg-slate-50 p-3">
+          <img id="user-avatar" class="w-10 h-10 rounded-full object-cover" alt="User avatar" />
+          <div class="min-w-0">
+            <p id="user-name" class="text-sm font-semibold truncate">Signed in</p>
+            <p class="text-xs text-slate-500">Google account linked</p>
+          </div>
+          <button id="logout-btn" class="ml-auto text-slate-500 hover:text-red-600">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <button id="login-btn" class="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition">
+          <i data-lucide="chrome" class="w-4 h-4"></i>
+          Continue with Google
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="flex-1 min-w-0">
+      <!-- Topbar -->
+      <header class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200">
+        <div class="px-4 md:px-6 xl:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p class="text-sm text-slate-500 font-medium">Context-Aware Job Lifecycle Automator</p>
+            <h2 id="page-title" class="text-2xl md:text-3xl font-extrabold tracking-tight">
+              Dashboard
+            </h2>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button id="sync-btn" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 text-white px-4 py-3 font-semibold hover:bg-indigo-700 transition shadow-sm">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Morning Sync
+            </button>
+
+            <button id="add-btn" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              Quick Add Job
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="px-4 md:px-6 xl:px-8 py-6 space-y-8">
+        <!-- Dashboard -->
+        <section id="dashboard" class="tab-panel active space-y-8">
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div class="xl:col-span-2 space-y-6">
+              <div class="rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-slate-900 text-white p-6 md:p-8 shadow-lg">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                  <div class="max-w-2xl">
+                    <p class="text-indigo-100 text-sm font-semibold tracking-wide uppercase">
+                      AI Job Search Control Center
+                    </p>
+                    <h3 class="text-2xl md:text-4xl font-extrabold leading-tight mt-2">
+                      Turn your resume into a live interview pipeline.
+                    </h3>
+                    <p class="text-indigo-100 mt-3 text-sm md:text-base leading-7">
+                      Parse your resume, discover fresh opportunities, track applications,
+                      and detect interview signals from recruiter emails in one place.
+                    </p>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3 min-w-[260px]">
+                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
+                      <p class="text-xs uppercase tracking-wide text-indigo-100">Last Sync</p>
+                      <p id="last-sync-label" class="text-lg font-bold mt-1">Never</p>
+                    </div>
+                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
+                      <p class="text-xs uppercase tracking-wide text-indigo-100">Profile</p>
+                      <p id="profile-status-label" class="text-lg font-bold mt-1">Not Parsed</p>
+                    </div>
+                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
+                      <p class="text-xs uppercase tracking-wide text-indigo-100">Keywords</p>
+                      <p id="keyword-count-label" class="text-lg font-bold mt-1">0</p>
+                    </div>
+                    <div class="rounded-2xl bg-white/10 p-4 border border-white/15">
+                      <p class="text-xs uppercase tracking-wide text-indigo-100">Tracked Jobs</p>
+                      <p id="job-count-label" class="text-lg font-bold mt-1">0</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="stats-container" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="rounded-2xl bg-white border border-slate-200 p-5">
+                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Applied</p>
+                  <p class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
+                </div>
+                <div class="rounded-2xl bg-white border border-slate-200 p-5">
+                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Interviewing</p>
+                  <p class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
+                </div>
+                <div class="rounded-2xl bg-white border border-slate-200 p-5">
+                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Offers</p>
+                  <p class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
+                </div>
+                <div class="rounded-2xl bg-white border border-slate-200 p-5">
+                  <p class="text-xs uppercase tracking-wide text-slate-500 font-bold">Recent Matches</p>
+                  <p id="match-count-label" class="text-3xl font-extrabold text-slate-900 mt-2">0</p>
+                </div>
+              </div>
+
+              <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
+                <div class="p-6 border-b border-slate-200 flex items-center justify-between gap-4">
+                  <div>
+                    <h3 class="text-lg font-extrabold">Pipeline Snapshot</h3>
+                    <p class="text-sm text-slate-500">A Kanban view of your current job lifecycle.</p>
+                  </div>
+                  <button class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 nav-jump" data-tab="pipeline">
+                    Open full board
+                  </button>
+                </div>
+
+                <div class="p-6">
+                  <div id="pipeline-preview" class="kanban-wrap">
+                    <div class="board-col rounded-2xl bg-slate-100 p-4">
+                      <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs uppercase font-bold text-slate-500">Applied</span>
+                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
+                      </div>
+                    </div>
+                    <div class="board-col rounded-2xl bg-slate-100 p-4">
+                      <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs uppercase font-bold text-slate-500">Interview</span>
+                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
+                      </div>
+                    </div>
+                    <div class="board-col rounded-2xl bg-slate-100 p-4">
+                      <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs uppercase font-bold text-slate-500">Offer</span>
+                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
+                      </div>
+                    </div>
+                    <div class="board-col rounded-2xl bg-slate-100 p-4">
+                      <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs uppercase font-bold text-slate-500">Rejected</span>
+                        <span class="text-xs bg-slate-200 rounded-full px-2 py-1">0</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-6">
+              <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-lg font-extrabold">Morning Sync</h3>
+                    <p class="text-sm text-slate-500">Real-time market scan and profile-aware matching.</p>
+                  </div>
+                  <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                    <i data-lucide="radar" class="w-5 h-5"></i>
+                  </div>
+                </div>
+
+                <div class="mt-5 space-y-4">
+                  <div class="rounded-2xl border border-slate-200 p-4">
+                    <p class="text-xs uppercase font-bold text-slate-500">Step 1</p>
+                    <p class="font-semibold mt-1">Load resume profile + custom keywords</p>
+                  </div>
+                  <div class="rounded-2xl border border-slate-200 p-4">
+                    <p class="text-xs uppercase font-bold text-slate-500">Step 2</p>
+                    <p class="font-semibold mt-1">Search jobs posted in the last 24 hours</p>
+                  </div>
+                  <div class="rounded-2xl border border-slate-200 p-4">
+                    <p class="text-xs uppercase font-bold text-slate-500">Step 3</p>
+                    <p class="font-semibold mt-1">Generate transparent match reasons</p>
+                  </div>
+                  <div class="rounded-2xl border border-slate-200 p-4">
+                    <p class="text-xs uppercase font-bold text-slate-500">Step 4</p>
+                    <p class="font-semibold mt-1">Quick add recommendations to the board</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-lg font-extrabold">Latest AI Insight</h3>
+                    <p class="text-sm text-slate-500">Why this system recommends certain jobs.</p>
+                  </div>
+                  <i data-lucide="brain-circuit" class="w-5 h-5 text-slate-400"></i>
+                </div>
+                <div id="insight-box" class="mt-4 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600 leading-7">
+                  No sync has run yet. Once recommendations are generated, their match reasoning will appear here.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Pipeline -->
+        <section id="pipeline" class="tab-panel space-y-6">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h3 class="text-2xl font-extrabold">Application Pipeline</h3>
+              <p class="text-slate-500">Manage the lifecycle from applied to offer.</p>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+              <input
+                id="job-search-input"
+                type="text"
+                placeholder="Search company or role..."
+                class="w-full sm:w-72 rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500"
+              />
+              <select id="job-filter-status" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
+                <option value="all">All statuses</option>
+                <option value="Applied">Applied</option>
+                <option value="Interview">Interview</option>
+                <option value="Offer">Offer</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="board" class="kanban-wrap">
+            <!-- JS renders columns here -->
+          </div>
+        </section>
+
+        <!-- Recommendations -->
+        <section id="recommendations" class="tab-panel space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div class="xl:col-span-2 rounded-3xl bg-white border border-slate-200 shadow-sm">
+              <div class="p-6 border-b border-slate-200 flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="text-2xl font-extrabold">Job Match Sync</h3>
+                  <p class="text-slate-500">Fresh opportunities grounded against your profile and keywords.</p>
+                </div>
+                <button id="sync-btn-secondary" class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 text-white px-4 py-3 font-semibold hover:bg-indigo-700 transition">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                  Run Sync
+                </button>
+              </div>
+
+              <div id="recommendations-list" class="p-6 space-y-4">
+                <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
+                  No recommendations yet. Run a sync to fetch relevant live postings.
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm space-y-5">
+              <div>
+                <h3 class="text-lg font-extrabold">Search Keywords</h3>
+                <p class="text-sm text-slate-500">Guide the sync toward your target roles and domains.</p>
+              </div>
+
+              <div class="space-y-3">
+                <label class="block text-sm font-semibold text-slate-700">Target keywords</label>
+                <textarea
+                  id="keyword-box"
+                  rows="8"
+                  placeholder="Example:
+Data Analyst
+Business Intelligence
+Python
+SQL
+Tableau
+OPT Sponsorship"
+                  class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500"
+                ></textarea>
+              </div>
+
+              <button id="save-keywords-btn" class="w-full rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition">
+                Save Keywords
+              </button>
+
+              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                <p class="text-xs uppercase tracking-wide font-bold text-slate-500">How matching works</p>
+                <p class="text-sm text-slate-600 leading-7 mt-2">
+                  The AI compares job titles, skills, seniority, domain alignment, and your custom keywords,
+                  then explains why a posting fits you with a match reason.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Profile -->
+        <section id="profile" class="tab-panel space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
+              <div class="p-6 border-b border-slate-200">
+                <h3 class="text-2xl font-extrabold">Resume Input</h3>
+                <p class="text-slate-500">Paste your raw resume and let AI extract structured entities.</p>
+              </div>
+
+              <div class="p-6 space-y-4">
+                <textarea
+                  id="resume-box"
+                  class="w-full h-[420px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 font-mono text-sm outline-none focus:border-indigo-500"
+                  placeholder="Paste your resume text here..."
+                ></textarea>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                  <button id="analyze-resume-btn" class="rounded-2xl bg-indigo-600 text-white px-5 py-3 font-semibold hover:bg-indigo-700 transition">
+                    Analyze Resume
+                  </button>
+                  <button id="save-resume-btn" class="rounded-2xl bg-slate-900 text-white px-5 py-3 font-semibold hover:bg-slate-800 transition">
+                    Save Resume
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
+              <div class="p-6 border-b border-slate-200 flex items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-2xl font-extrabold">Structured Resume Profile</h3>
+                  <p class="text-slate-500">Entity extraction output used for matching.</p>
+                </div>
+                <i data-lucide="file-json-2" class="w-5 h-5 text-slate-400"></i>
+              </div>
+
+              <div class="p-6">
+                <pre id="parsed-profile-output" class="rounded-2xl bg-slate-950 text-slate-100 p-5 text-sm overflow-auto min-h-[420px] whitespace-pre-wrap">{
+  "skills": [],
+  "roles": [],
+  "experienceLevel": "",
+  "domains": [],
+  "locations": [],
+  "education": []
+}</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Inbox -->
+        <section id="inbox" class="tab-panel space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
+              <div class="p-6 border-b border-slate-200">
+                <h3 class="text-2xl font-extrabold">Recruiter Email Parser</h3>
+                <p class="text-slate-500">Detect lifecycle state changes from natural language.</p>
+              </div>
+
+              <div class="p-6 space-y-4">
+                <textarea
+                  id="email-parser-input"
+                  rows="16"
+                  class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm outline-none focus:border-indigo-500"
+                  placeholder="Paste recruiter email text here...
+
+Example:
+We'd like to move forward with an interview for the Data Analyst role..."
+                ></textarea>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                  <button id="parse-email-btn" class="rounded-2xl bg-indigo-600 text-white px-5 py-3 font-semibold hover:bg-indigo-700 transition">
+                    Parse Email Status
+                  </button>
+                  <select id="email-job-link" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
+                    <option value="">Link result to tracked job</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-3xl bg-white border border-slate-200 shadow-sm">
+              <div class="p-6 border-b border-slate-200">
+                <h3 class="text-2xl font-extrabold">Detected State</h3>
+                <p class="text-slate-500">Natural language understanding output.</p>
+              </div>
+
+              <div class="p-6 space-y-4">
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-5">
+                  <p class="text-xs uppercase tracking-wide font-bold text-slate-500">Detected Status</p>
+                  <p id="parsed-email-status" class="text-2xl font-extrabold mt-2 text-slate-900">No signal detected</p>
+                </div>
+
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-5">
+                  <p class="text-xs uppercase tracking-wide font-bold text-slate-500">Reasoning</p>
+                  <p id="parsed-email-reason" class="text-sm text-slate-600 leading-7 mt-2">
+                    Paste an email and parse it to extract lifecycle intent such as Interview, Rejection, Offer, or Follow-up.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section id="settings" class="tab-panel space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm space-y-5">
+              <div>
+                <h3 class="text-2xl font-extrabold">System Settings</h3>
+                <p class="text-slate-500">Control sync behavior and client-side preferences.</p>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-2">Sync window</label>
+                  <select id="sync-window" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
+                    <option value="24">Jobs posted in last 24 hours</option>
+                    <option value="48">Jobs posted in last 48 hours</option>
+                    <option value="72">Jobs posted in last 72 hours</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-2">Preferred locations</label>
+                  <input
+                    id="preferred-location"
+                    type="text"
+                    placeholder="Hartford, CT / Remote / New York"
+                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-2">Notes</label>
+                  <textarea
+                    id="user-notes"
+                    rows="5"
+                    placeholder="Anything the AI should prioritize..."
+                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500"
+                  ></textarea>
+                </div>
+              </div>
+
+              <button id="save-settings-btn" class="w-full rounded-2xl bg-slate-900 text-white px-4 py-3 font-semibold hover:bg-slate-800 transition">
+                Save Preferences
+              </button>
+            </div>
+
+            <div class="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm space-y-5">
+              <div>
+                <h3 class="text-2xl font-extrabold">Architecture Summary</h3>
+                <p class="text-slate-500">What this product is designed to do.</p>
+              </div>
+
+              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-5 space-y-4 text-sm text-slate-600 leading-7">
+                <p>
+                  <span class="font-semibold text-slate-800">Persistence Layer:</span>
+                  Firestore stores resume profile, keywords, applications, and sync metadata per anonymous user.
+                </p>
+                <p>
+                  <span class="font-semibold text-slate-800">Intelligence Layer:</span>
+                  Gemini parses resume text, matches live postings, and detects lifecycle transitions from recruiter emails.
+                </p>
+                <p>
+                  <span class="font-semibold text-slate-800">Presentation Layer:</span>
+                  A minimalist Kanban-based UI reduces cognitive load while keeping the job search stateful and transparent.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Mobile nav -->
+  <nav class="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">
+    <div class="grid grid-cols-5">
+      <button class="mobile-nav-link active flex flex-col items-center justify-center gap-1 py-3 text-indigo-600 text-xs font-semibold" data-tab="dashboard">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+        Home
+      </button>
+      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="pipeline">
+        <i data-lucide="briefcase-business" class="w-4 h-4"></i>
+        Jobs
+      </button>
+      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="recommendations">
+        <i data-lucide="search-code" class="w-4 h-4"></i>
+        Sync
+      </button>
+      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="profile">
+        <i data-lucide="file-text" class="w-4 h-4"></i>
+        Resume
+      </button>
+      <button class="mobile-nav-link flex flex-col items-center justify-center gap-1 py-3 text-slate-500 text-xs font-semibold" data-tab="inbox">
+        <i data-lucide="mail-search" class="w-4 h-4"></i>
+        Email
+      </button>
+    </div>
+  </nav>
+
+  <!-- Add Job Modal -->
+  <div id="add-modal" class="hidden fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm p-4">
+    <div class="min-h-full flex items-center justify-center">
+      <div class="w-full max-w-xl rounded-3xl bg-white border border-slate-200 shadow-2xl">
+        <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h3 class="text-xl font-extrabold">Quick Add Job</h3>
+            <p class="text-sm text-slate-500">Manually add a company and role into your pipeline.</p>
+          </div>
+          <button id="close-modal" class="rounded-xl p-2 hover:bg-slate-100 text-slate-500">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form id="add-job-form" class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-2">Company</label>
+            <input id="job-company" type="text" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500" placeholder="Amazon" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-2">Role</label>
+            <input id="job-role" type="text" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500" placeholder="Data Analyst" />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Status</label>
+              <select id="job-status" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500">
+                <option value="Applied">Applied</option>
+                <option value="Interview">Interview</option>
+                <option value="Offer">Offer</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Application Link</label>
+              <input id="job-link" type="url" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-indigo-500" placeholder="https://..." />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-2">Notes</label>
+            <textarea id="job-notes" rows="4" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500" placeholder="Optional notes, recruiter info, salary, etc."></textarea>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3 pt-2">
+            <button type="submit" class="flex-1 rounded-2xl bg-indigo-600 text-white px-4 py-3 font-semibold hover:bg-indigo-700 transition">
+              Save Job
+            </button>
+            <button type="button" id="cancel-modal" class="flex-1 rounded-2xl bg-slate-100 text-slate-800 px-4 py-3 font-semibold hover:bg-slate-200 transition">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[60] rounded-full bg-slate-900 text-white px-5 py-3 text-sm font-semibold shadow-xl">
+    Saved
+  </div>
+
+  <script>
+    const pageTitle = document.getElementById("page-title");
+    const navLinks = document.querySelectorAll(".nav-link, .mobile-nav-link, .nav-jump");
+    const panels = document.querySelectorAll(".tab-panel");
+
+    function activateTab(tabId) {
+      panels.forEach(panel => panel.classList.remove("active"));
+      document.getElementById(tabId)?.classList.add("active");
+
+      document.querySelectorAll(".nav-link").forEach(btn => {
+        btn.classList.remove("active", "bg-indigo-50", "text-indigo-700");
+        btn.classList.add("text-slate-700");
+        if (btn.dataset.tab === tabId) {
+          btn.classList.add("active", "bg-indigo-50", "text-indigo-700");
+        }
+      });
+
+      document.querySelectorAll(".mobile-nav-link").forEach(btn => {
+        btn.classList.remove("active", "text-indigo-600");
+        btn.classList.add("text-slate-500");
+        if (btn.dataset.tab === tabId) {
+          btn.classList.add("active", "text-indigo-600");
+          btn.classList.remove("text-slate-500");
+        }
+      });
+
+      const titleMap = {
+        dashboard: "Dashboard",
+        pipeline: "Application Pipeline",
+        recommendations: "Job Match Sync",
+        profile: "Resume Profile",
+        inbox: "Email Status Parser",
+        settings: "Settings"
+      };
+
+      pageTitle.textContent = titleMap[tabId] || "Dashboard";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    navLinks.forEach(btn => {
+      btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+    });
+
+    document.getElementById("cancel-modal")?.addEventListener("click", () => {
+      document.getElementById("add-modal").classList.add("hidden");
+    });
+
+    lucide.createIcons();
+  </script>
+
+  <script src="script.js"></script>
+</body>
+</html>
