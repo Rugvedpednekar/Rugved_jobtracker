@@ -3,24 +3,27 @@ import os
 import re
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
+from urllib.parse import urlparse
 
 import boto3
+import requests
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
+from bs4 import BeautifulSoup
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import JSON, DateTime, Integer, String, Text, create_engine, desc, select
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text, create_engine, desc, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
-APP_TITLE = "JobTracker Personal Dashboard"
+APP_TITLE = "JobTracker Personal Career Assistant"
 BASE_DIR = Path(__file__).resolve().parent
 INDEX_FILE = BASE_DIR / "index.html"
 SCRIPT_FILE = BASE_DIR / "script.js"
@@ -36,6 +39,59 @@ NOVA_MODEL_ID = os.getenv("NOVA_MODEL_ID", "us.amazon.nova-lite-v1:0")
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 REQUIRE_NOVA = os.getenv("REQUIRE_NOVA", "false").strip().lower() == "true"
 PORT = int(os.getenv("PORT", "8000"))
+REQUEST_TIMEOUT = int(os.getenv("FETCH_TIMEOUT_SECONDS", "20"))
+
+STATUS_ORDER = ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Rejected", "Archived", "Later"]
+STATUS_MAP = {
+    "wishlist": "Wishlist",
+    "saved": "Wishlist",
+    "save to wishlist": "Wishlist",
+    "applied": "Applied",
+    "application": "Applied",
+    "submitted": "Applied",
+    "interview": "Interview",
+    "interviewing": "Interview",
+    "offer": "Offered",
+    "offered": "Offered",
+    "accepted": "Accepted",
+    "rejected": "Rejected",
+    "archived": "Archived",
+    "later": "Later",
+    "save for later": "Later",
+}
+ACTION_TO_STATUS = {
+    "mark_applied": "Applied",
+    "save_wishlist": "Wishlist",
+    "save_later": "Later",
+}
+DOCUMENT_TYPES = ["resume", "cover_letter", "tailored_resume", "generated_cover_letter", "other"]
+TASK_STATUSES = ["open", "in_progress", "done"]
+TASK_TYPES = ["follow_up", "resume", "cover_letter", "interview_prep", "briefing", "research", "other"]
+
+DEFAULT_PARSED_PROFILE = {
+    "skills": [],
+    "roles": [],
+    "experienceLevel": "",
+    "domains": [],
+    "locations": [],
+    "education": [],
+    "summary": "",
+}
+DEFAULT_SETTINGS = {
+    "sync_window_hours": 24,
+    "preferred_location": "",
+    "user_notes": "",
+    "tone": "concise",
+}
+STATE_DEFAULTS = {
+    "resume_text": "",
+    "parsed_profile": DEFAULT_PARSED_PROFILE,
+    "keywords": [],
+    "settings": DEFAULT_SETTINGS,
+    "last_sync": None,
+    "gmail_sync": {"enabled": False, "provider": "gmail", "status": "placeholder"},
+}
+
 
 def normalize_database_url(database_url: str) -> str:
     url = (database_url or "").strip()
@@ -51,74 +107,94 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 COOKIE_NAME = "jobtracker_token"
 IS_PRODUCTION = APP_ENV == "production"
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
-
-STATUS_ORDER = ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Rejected", "Archived"]
-STATUS_MAP = {
-    "wishlist": "Wishlist",
-    "saved": "Wishlist",
-    "applied": "Applied",
-    "application": "Applied",
-    "submitted": "Applied",
-    "interview": "Interview",
-    "interviewing": "Interview",
-    "screen": "Interview",
-    "screening": "Interview",
-    "offer": "Offered",
-    "offered": "Offered",
-    "accepted": "Accepted",
-    "rejected": "Rejected",
-    "declined": "Rejected",
-    "archived": "Archived",
-    "archive": "Archived",
-}
-DEFAULT_PARSED_PROFILE = {
-    "skills": [],
-    "roles": [],
-    "experienceLevel": "",
-    "domains": [],
-    "locations": [],
-    "education": [],
-}
-DEFAULT_SETTINGS = {
-    "sync_window_hours": 24,
-    "preferred_location": "",
-    "user_notes": "",
-}
-STATE_DEFAULTS = {
-    "resume_text": "",
-    "parsed_profile": DEFAULT_PARSED_PROFILE,
-    "keywords": [],
-    "settings": DEFAULT_SETTINGS,
-    "last_sync": None,
-}
 
 
 class Base(DeclarativeBase):
     pass
 
 
-class JobRecord(Base):
-    __tablename__ = "jobs"
-
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
-    company: Mapped[str] = mapped_column(String(255), default="")
-    role: Mapped[str] = mapped_column(String(255), default="")
-    status: Mapped[str] = mapped_column(String(32), default="Applied")
-    date: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    field: Mapped[str] = mapped_column(String(120), default="")
-    sponsor: Mapped[str] = mapped_column(String(120), default="")
-    notes: Mapped[str] = mapped_column(Text, default="")
-    link: Mapped[str] = mapped_column(Text, default="")
-    salary: Mapped[str] = mapped_column(String(120), default="")
+class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+
+class JobRecord(TimestampMixin, Base):
+    __tablename__ = "jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    company: Mapped[str] = mapped_column(String(255), default="")
+    role: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(32), default="Applied")
+    date: Mapped[date] = mapped_column(Date, default=lambda: datetime.now(timezone.utc).date())
+    field: Mapped[str] = mapped_column(String(120), default="")
+    sponsor: Mapped[str] = mapped_column(String(120), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    link: Mapped[str] = mapped_column(Text, default="")
+    salary: Mapped[str] = mapped_column(String(120), default="")
+    location: Mapped[str] = mapped_column(String(255), default="")
+    job_summary: Mapped[str] = mapped_column(Text, default="")
+    skills: Mapped[List[str]] = mapped_column(JSON, default=list)
+    source: Mapped[str] = mapped_column(String(64), default="manual")
+    intake_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    ai_match_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    ai_match_summary: Mapped[str] = mapped_column(Text, default="")
+    metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class JobIntakeRecord(TimestampMixin, Base):
+    __tablename__ = "job_intakes"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    url: Mapped[str] = mapped_column(Text, default="")
+    source_host: Mapped[str] = mapped_column(String(255), default="")
+    raw_html: Mapped[str] = mapped_column(Text, default="")
+    raw_text: Mapped[str] = mapped_column(Text, default="")
+    parse_status: Mapped[str] = mapped_column(String(32), default="parsed")
+    parsed_job: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    suggested_actions: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list)
+    selected_action: Mapped[str] = mapped_column(String(64), default="")
+
+
+class DocumentRecord(TimestampMixin, Base):
+    __tablename__ = "documents"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    name: Mapped[str] = mapped_column(String(255), default="")
+    doc_type: Mapped[str] = mapped_column(String(64), default="other")
+    content_text: Mapped[str] = mapped_column(Text, default="")
+    linked_job_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class TaskRecord(TimestampMixin, Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    title: Mapped[str] = mapped_column(String(255), default="")
+    details: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(32), default="open")
+    task_type: Mapped[str] = mapped_column(String(64), default="other")
+    linked_job_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    metadata_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class ChatHistoryRecord(Base):
+    __tablename__ = "chat_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    role: Mapped[str] = mapped_column(String(16))
+    message: Mapped[str] = mapped_column(Text)
+    context_type: Mapped[str] = mapped_column(String(64), default="general")
+    linked_job_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class AppStateRecord(Base):
@@ -131,15 +207,6 @@ class AppStateRecord(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-
-
-class ChatHistoryRecord(Base):
-    __tablename__ = "chat_history"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    role: Mapped[str] = mapped_column(String(16))
-    message: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 engine = None
@@ -161,6 +228,14 @@ class JobCreate(BaseModel):
     notes: str = ""
     link: str = ""
     salary: str = ""
+    location: str = ""
+    job_summary: str = ""
+    skills: List[str] = Field(default_factory=list)
+    source: str = "manual"
+    intake_id: Optional[str] = None
+    ai_match_score: Optional[int] = None
+    ai_match_summary: str = ""
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
 
 
 class JobUpdate(BaseModel):
@@ -173,6 +248,12 @@ class JobUpdate(BaseModel):
     notes: Optional[str] = None
     link: Optional[str] = None
     salary: Optional[str] = None
+    location: Optional[str] = None
+    job_summary: Optional[str] = None
+    skills: Optional[List[str]] = None
+    ai_match_score: Optional[int] = None
+    ai_match_summary: Optional[str] = None
+    metadata_json: Optional[Dict[str, Any]] = None
 
 
 class ResumeAnalyzeRequest(BaseModel):
@@ -201,6 +282,22 @@ class SettingsRequest(BaseModel):
     sync_window_hours: int = 24
     preferred_location: str = ""
     user_notes: str = ""
+    tone: str = "concise"
+
+
+class ParseJobLinkRequest(BaseModel):
+    url: HttpUrl
+
+
+class JobActionRequest(BaseModel):
+    intake_id: str
+    action: str
+    company: Optional[str] = None
+    role: Optional[str] = None
+
+
+class TaskUpdateRequest(BaseModel):
+    status: str
 
 
 class JobResponse(BaseModel):
@@ -210,12 +307,45 @@ class JobResponse(BaseModel):
     company: str
     role: str
     status: str
-    date: str
+    date: date
     field: str
     sponsor: str
     notes: str
     link: str
     salary: str
+    location: str
+    job_summary: str
+    skills: List[str]
+    source: str
+    intake_id: Optional[str]
+    ai_match_score: Optional[int]
+    ai_match_summary: str
+    metadata_json: Dict[str, Any]
+
+
+class TaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    details: str
+    status: str
+    task_type: str
+    linked_job_id: Optional[str]
+    due_date: Optional[date]
+    metadata_json: Dict[str, Any]
+
+
+class DocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    doc_type: str
+    content_text: str
+    linked_job_id: Optional[str]
+    metadata_json: Dict[str, Any]
+    is_active: bool
 
 
 class GmailSyncService:
@@ -223,13 +353,17 @@ class GmailSyncService:
         return {
             "enabled": False,
             "provider": "gmail",
-            "status": "not_configured",
-            "message": "Gmail sync is intentionally not implemented yet. Add OAuth/configuration in a dedicated service later.",
+            "status": "placeholder",
+            "message": "Gmail sync architecture is scaffolded. OAuth and mailbox sync are intentionally not implemented yet.",
+            "next_steps": [
+                "Create a dedicated gmail_accounts table",
+                "Store encrypted refresh tokens",
+                "Schedule sync jobs with Railway cron or worker",
+            ],
         }
 
 
 gmail_sync_service = GmailSyncService()
-
 bedrock = boto3.client(
     "bedrock-runtime",
     region_name=AWS_REGION,
@@ -265,6 +399,48 @@ def init_engine() -> None:
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
+def normalize_status(status: str) -> str:
+    return STATUS_MAP.get((status or "").strip().lower(), status.strip().title() if status else "Applied")
+
+
+def safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
+    try:
+        return json.loads(text)
+    except Exception:
+        match = re.search(r"\{.*\}", text or "", flags=re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                return None
+    return None
+
+
+def extract_text_from_bedrock_response(resp: Dict[str, Any]) -> str:
+    try:
+        return "\n".join(item["text"] for item in resp["output"]["message"]["content"] if "text" in item).strip()
+    except Exception:
+        return ""
+
+
+def nova_converse(system_prompt: str, user_prompt: str, temperature: float = 0.2, max_tokens: int = 2200) -> str:
+    try:
+        response = bedrock.converse(
+            modelId=NOVA_MODEL_ID,
+            system=[{"text": system_prompt}],
+            messages=[{"role": "user", "content": [{"text": user_prompt}]}],
+            inferenceConfig={"maxTokens": max_tokens, "temperature": temperature, "topP": 0.9},
+        )
+        text = extract_text_from_bedrock_response(response)
+        if not text:
+            raise RuntimeError("Empty response from Nova")
+        return text
+    except (ClientError, BotoCoreError, Exception) as exc:
+        if REQUIRE_NOVA:
+            raise HTTPException(status_code=500, detail=f"Nova error: {exc}") from exc
+        raise RuntimeError(f"Nova error: {exc}") from exc
+
+
 class StateService:
     def __init__(self, db: Session):
         self.db = db
@@ -279,8 +455,7 @@ class StateService:
     def set(self, key: str, value: Any) -> None:
         record = self.db.get(AppStateRecord, key)
         if record is None:
-            record = AppStateRecord(key=key, value=value)
-            self.db.add(record)
+            self.db.add(AppStateRecord(key=key, value=value))
         else:
             record.value = value
             record.updated_at = datetime.now(timezone.utc)
@@ -300,19 +475,27 @@ class JobService:
         self.db = db
 
     def list(self) -> List[JobRecord]:
-        return list(self.db.scalars(select(JobRecord).order_by(desc(JobRecord.date), desc(JobRecord.created_at))))
+        return list(self.db.scalars(select(JobRecord).order_by(desc(JobRecord.updated_at), desc(JobRecord.created_at))))
 
     def create(self, payload: JobCreate) -> JobRecord:
         job = JobRecord(
             company=payload.company.strip(),
             role=payload.role.strip(),
             status=normalize_status(payload.status),
-            date=payload.date,
+            date=date.fromisoformat(payload.date),
             field=payload.field.strip(),
             sponsor=payload.sponsor.strip(),
             notes=payload.notes.strip(),
             link=payload.link.strip(),
             salary=payload.salary.strip(),
+            location=payload.location.strip(),
+            job_summary=payload.job_summary.strip(),
+            skills=payload.skills,
+            source=payload.source,
+            intake_id=payload.intake_id,
+            ai_match_score=payload.ai_match_score,
+            ai_match_summary=payload.ai_match_summary.strip(),
+            metadata_json=payload.metadata_json,
         )
         self.db.add(job)
         self.db.commit()
@@ -328,6 +511,8 @@ class JobService:
                 value = value.strip()
             if field == "status" and value is not None:
                 value = normalize_status(value)
+            if field == "date" and value:
+                value = date.fromisoformat(value)
             setattr(job, field, value)
         job.updated_at = datetime.now(timezone.utc)
         self.db.commit()
@@ -346,17 +531,470 @@ class ChatService:
     def __init__(self, db: Session):
         self.db = db
 
-    def append(self, role: str, message: str) -> None:
-        self.db.add(ChatHistoryRecord(role=role, message=message.strip()))
+    def append(self, role: str, message: str, context_type: str = "general", linked_job_id: Optional[str] = None) -> None:
+        self.db.add(ChatHistoryRecord(role=role, message=message.strip(), context_type=context_type, linked_job_id=linked_job_id))
         self.db.commit()
 
-    def tail(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def tail(self, limit: int = 12) -> List[Dict[str, Any]]:
         rows = list(self.db.scalars(select(ChatHistoryRecord).order_by(desc(ChatHistoryRecord.created_at)).limit(limit)))
         rows.reverse()
         return [
-            {"role": row.role, "message": row.message, "created_at": row.created_at.isoformat()}
+            {
+                "role": row.role,
+                "message": row.message,
+                "context_type": row.context_type,
+                "linked_job_id": row.linked_job_id,
+                "created_at": row.created_at.isoformat(),
+            }
             for row in rows
         ]
+
+
+class DocumentService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def list(self) -> List[DocumentRecord]:
+        return list(self.db.scalars(select(DocumentRecord).where(DocumentRecord.is_active.is_(True)).order_by(desc(DocumentRecord.updated_at))))
+
+    def upsert_text_document(self, name: str, doc_type: str, content_text: str, linked_job_id: Optional[str] = None, metadata_json: Optional[Dict[str, Any]] = None) -> DocumentRecord:
+        stmt = select(DocumentRecord).where(DocumentRecord.doc_type == doc_type, DocumentRecord.linked_job_id == linked_job_id, DocumentRecord.is_active.is_(True))
+        record = self.db.scalar(stmt)
+        if record is None:
+            record = DocumentRecord(name=name, doc_type=doc_type, linked_job_id=linked_job_id)
+            self.db.add(record)
+        record.content_text = content_text.strip()
+        record.name = name
+        record.metadata_json = metadata_json or {}
+        record.updated_at = datetime.now(timezone.utc)
+        self.db.commit()
+        self.db.refresh(record)
+        return record
+
+
+class TaskService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def list(self) -> List[TaskRecord]:
+        return list(self.db.scalars(select(TaskRecord).order_by(TaskRecord.status.asc(), TaskRecord.due_date.asc(), desc(TaskRecord.created_at))))
+
+    def create_many(self, tasks: List[Dict[str, Any]], linked_job_id: Optional[str] = None) -> List[TaskRecord]:
+        created: List[TaskRecord] = []
+        for task in tasks:
+            title = (task.get("title") or "").strip()
+            if not title:
+                continue
+            due = task.get("due_date")
+            due_date = None
+            if due:
+                try:
+                    due_date = date.fromisoformat(due)
+                except ValueError:
+                    due_date = None
+            record = TaskRecord(
+                title=title,
+                details=(task.get("details") or "").strip(),
+                status=task.get("status", "open") if task.get("status") in TASK_STATUSES else "open",
+                task_type=task.get("task_type", "other") if task.get("task_type") in TASK_TYPES else "other",
+                linked_job_id=linked_job_id or task.get("linked_job_id"),
+                due_date=due_date,
+                metadata_json=task.get("metadata_json") or {},
+            )
+            self.db.add(record)
+            created.append(record)
+        self.db.commit()
+        for item in created:
+            self.db.refresh(item)
+        return created
+
+    def update_status(self, task_id: str, status: str) -> TaskRecord:
+        task = self.db.get(TaskRecord, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        task.status = status if status in TASK_STATUSES else "open"
+        task.updated_at = datetime.now(timezone.utc)
+        self.db.commit()
+        self.db.refresh(task)
+        return task
+
+
+class IntakeService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, url: str, raw_html: str, raw_text: str, parsed_job: Dict[str, Any], suggested_actions: List[Dict[str, Any]]) -> JobIntakeRecord:
+        intake = JobIntakeRecord(
+            url=url,
+            source_host=urlparse(url).netloc,
+            raw_html=raw_html,
+            raw_text=raw_text,
+            parsed_job=parsed_job,
+            suggested_actions=suggested_actions,
+            parse_status="parsed",
+        )
+        self.db.add(intake)
+        self.db.commit()
+        self.db.refresh(intake)
+        return intake
+
+    def set_action(self, intake_id: str, action: str) -> JobIntakeRecord:
+        intake = self.db.get(JobIntakeRecord, intake_id)
+        if intake is None:
+            raise HTTPException(status_code=404, detail="Job intake not found")
+        intake.selected_action = action
+        intake.updated_at = datetime.now(timezone.utc)
+        self.db.commit()
+        self.db.refresh(intake)
+        return intake
+
+    def recent(self, limit: int = 8) -> List[JobIntakeRecord]:
+        return list(self.db.scalars(select(JobIntakeRecord).order_by(desc(JobIntakeRecord.created_at)).limit(limit)))
+
+
+def compute_job_stats(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    counts = {status: 0 for status in STATUS_ORDER}
+    for job in jobs:
+        status = normalize_status(job.get("status", "Applied"))
+        counts[status] = counts.get(status, 0) + 1
+    return {
+        "total_jobs": len(jobs),
+        "wishlist_count": counts.get("Wishlist", 0),
+        "applied_count": counts.get("Applied", 0),
+        "interview_count": counts.get("Interview", 0),
+        "offered_count": counts.get("Offered", 0),
+        "accepted_count": counts.get("Accepted", 0),
+        "rejected_count": counts.get("Rejected", 0),
+        "later_count": counts.get("Later", 0),
+        "by_status": counts,
+    }
+
+
+def fallback_resume_parse(resume_text: str) -> Dict[str, Any]:
+    text = resume_text.lower()
+    common_skills = [
+        "python", "sql", "java", "javascript", "typescript", "react", "node", "aws", "excel", "tableau",
+        "power bi", "pandas", "scikit-learn", "fastapi", "docker", "git", "linux", "c++", "machine learning",
+        "data analysis", "postgresql", "css", "html",
+    ]
+    roles = [
+        "data analyst", "software engineer", "data engineer", "business analyst", "machine learning engineer",
+        "product analyst", "full stack engineer", "backend engineer",
+    ]
+    years = re.findall(r"(\d+)\+?\s+year", text)
+    experience = ""
+    if years:
+        value = max(int(item) for item in years)
+        experience = "Entry Level" if value <= 1 else "Early Career" if value <= 3 else "Experienced"
+    elif any(token in text for token in ["intern", "graduate", "student"]):
+        experience = "Entry Level"
+    return {
+        "skills": sorted({skill.title() for skill in common_skills if skill in text}),
+        "roles": sorted({role.title() for role in roles if role in text}),
+        "experienceLevel": experience,
+        "domains": [],
+        "locations": [],
+        "education": [],
+        "summary": "Fallback profile parse generated locally.",
+    }
+
+
+def ai_parse_resume(resume_text: str) -> Dict[str, Any]:
+    system_prompt = (
+        "You are an expert resume parser. Return ONLY valid JSON with schema "
+        '{"skills":[string],"roles":[string],"experienceLevel":string,"domains":[string],"locations":[string],"education":[string],"summary":string}'
+    )
+    try:
+        parsed = safe_json_loads(nova_converse(system_prompt, f"Parse this resume text:\n\n{resume_text}", 0.1))
+        if parsed:
+            for key, default in DEFAULT_PARSED_PROFILE.items():
+                parsed.setdefault(key, default)
+            return parsed
+    except Exception:
+        pass
+    return fallback_resume_parse(resume_text)
+
+
+def fallback_email_parse(email_text: str) -> Dict[str, Any]:
+    text = email_text.lower()
+    if any(token in text for token in ["interview", "phone screen", "next round", "schedule a call"]):
+        return {"status": "Interview", "reason": "The email mentions an interview or screening step."}
+    if any(token in text for token in ["offer", "compensation package", "pleased to offer"]):
+        return {"status": "Offered", "reason": "The email contains offer-related language."}
+    if any(token in text for token in ["welcome aboard", "glad to welcome", "accepted"]):
+        return {"status": "Accepted", "reason": "The email implies onboarding or acceptance."}
+    if any(token in text for token in ["regret to inform", "not moving forward", "unfortunately", "rejected"]):
+        return {"status": "Rejected", "reason": "The email contains rejection language."}
+    return {"status": "Applied", "reason": "No clear lifecycle change detected."}
+
+
+def ai_parse_email(email_text: str) -> Dict[str, Any]:
+    system_prompt = (
+        "You classify recruiter emails into a job pipeline stage. Return ONLY valid JSON: "
+        '{"status":"Wishlist|Applied|Interview|Offered|Accepted|Rejected","reason":"short explanation"}'
+    )
+    try:
+        parsed = safe_json_loads(nova_converse(system_prompt, f"Classify this email:\n\n{email_text}", 0.0))
+        if parsed and parsed.get("status"):
+            return {"status": normalize_status(parsed["status"]), "reason": parsed.get("reason", "")}
+    except Exception:
+        pass
+    return fallback_email_parse(email_text)
+
+
+def fallback_parse_job_text(raw_text: str, url: str) -> Dict[str, Any]:
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    host = urlparse(url).netloc
+    role = lines[0][:120] if lines else "Unknown role"
+    company = next((line for line in lines[:15] if len(line.split()) <= 6 and line.lower() not in role.lower()), host or "Unknown company")
+    location_match = re.search(r"(remote|hybrid|on-site|onsite|[A-Z][a-z]+,\s?[A-Z]{2})", raw_text, re.IGNORECASE)
+    salary_match = re.search(r"\$[\d,]+(?:\s*-\s*\$[\d,]+)?", raw_text)
+    skill_bank = ["Python", "SQL", "FastAPI", "AWS", "Postgres", "JavaScript", "HTML", "CSS", "Docker", "React"]
+    skills = [skill for skill in skill_bank if skill.lower() in raw_text.lower()]
+    summary = " ".join(lines[:6])[:900]
+    return {
+        "company": company,
+        "role": role,
+        "location": location_match.group(0) if location_match else "",
+        "employment_type": "",
+        "salary": salary_match.group(0) if salary_match else "",
+        "skills": skills,
+        "summary": summary,
+        "responsibilities": lines[6:12],
+        "qualifications": lines[12:18],
+        "keywords": skills,
+        "field": "",
+        "source_url": url,
+    }
+
+
+def ai_parse_job_description(raw_text: str, url: str) -> Dict[str, Any]:
+    system_prompt = (
+        "You parse job descriptions into structured JSON. Return ONLY valid JSON with schema "
+        '{"company":string,"role":string,"location":string,"employment_type":string,"salary":string,'
+        '"skills":[string],"summary":string,"responsibilities":[string],"qualifications":[string],"keywords":[string],"field":string,"source_url":string}'
+    )
+    try:
+        parsed = safe_json_loads(nova_converse(system_prompt, f"Job URL: {url}\n\nRaw job text:\n{raw_text[:20000]}", 0.1, 2500))
+        if parsed:
+            parsed.setdefault("source_url", url)
+            parsed.setdefault("skills", [])
+            parsed.setdefault("responsibilities", [])
+            parsed.setdefault("qualifications", [])
+            parsed.setdefault("keywords", parsed.get("skills", []))
+            parsed.setdefault("summary", "")
+            parsed.setdefault("field", "")
+            return parsed
+    except Exception:
+        pass
+    return fallback_parse_job_text(raw_text, url)
+
+
+def fallback_match_analysis(parsed_job: Dict[str, Any], resume_text: str, parsed_profile: Dict[str, Any], keywords: List[str]) -> Dict[str, Any]:
+    resume_blob = f"{resume_text}\n{json.dumps(parsed_profile)}\n{' '.join(keywords)}".lower()
+    job_skills = parsed_job.get("skills", [])
+    matched = [skill for skill in job_skills if skill.lower() in resume_blob]
+    missing = [skill for skill in job_skills if skill not in matched]
+    score = min(98, 45 + len(matched) * 12 - len(missing) * 4)
+    score = max(28, score)
+    return {
+        "score": score,
+        "matched_skills": matched,
+        "missing_skills": missing,
+        "summary": f"You match {len(matched)} of {len(job_skills)} highlighted skills.",
+        "tailoring_notes": [
+            "Emphasize quantified impact in recent projects.",
+            "Mirror the job title and core platform keywords in your summary.",
+            "Add the most relevant tools near the top of the resume.",
+        ],
+    }
+
+
+def ai_match_resume(parsed_job: Dict[str, Any], resume_text: str, parsed_profile: Dict[str, Any], keywords: List[str]) -> Dict[str, Any]:
+    payload = {
+        "job": parsed_job,
+        "resume_text": resume_text[:12000],
+        "parsed_profile": parsed_profile,
+        "keywords": keywords,
+    }
+    system_prompt = (
+        "You are a career assistant. Return ONLY valid JSON with schema "
+        '{"score":number,"matched_skills":[string],"missing_skills":[string],"summary":string,"tailoring_notes":[string]}'
+    )
+    try:
+        parsed = safe_json_loads(nova_converse(system_prompt, json.dumps(payload), 0.2, 1800))
+        if parsed and isinstance(parsed.get("score"), (int, float)):
+            return parsed
+    except Exception:
+        pass
+    return fallback_match_analysis(parsed_job, resume_text, parsed_profile, keywords)
+
+
+def ai_generate_tailored_resume(parsed_job: Dict[str, Any], resume_text: str, parsed_profile: Dict[str, Any]) -> str:
+    system_prompt = "You rewrite resumes into a tailored plain-text resume. Keep it concise, factual, ATS-friendly, and structured with sections."
+    fallback = (
+        f"TARGET ROLE\n{parsed_job.get('role', '')} at {parsed_job.get('company', '')}\n\n"
+        f"PROFESSIONAL SUMMARY\nTailored toward {parsed_job.get('role', 'the target role')} with emphasis on {', '.join(parsed_job.get('skills', [])[:6]) or 'core matching skills'}.\n\n"
+        f"EXPERIENCE HIGHLIGHTS\n- Reorder your strongest accomplishments to match the role requirements.\n"
+        f"- Highlight measurable impact, ownership, and tools such as {', '.join(parsed_job.get('skills', [])[:5]) or 'relevant technologies'}.\n\n"
+        f"BASE RESUME\n{resume_text[:4000]}"
+    )
+    try:
+        return nova_converse(system_prompt, json.dumps({"job": parsed_job, "resume_text": resume_text[:12000], "parsed_profile": parsed_profile}), 0.35, 2400)
+    except Exception:
+        return fallback
+
+
+def ai_generate_cover_letter(parsed_job: Dict[str, Any], resume_text: str, parsed_profile: Dict[str, Any], settings: Dict[str, Any]) -> str:
+    system_prompt = "You write concise, modern, personalized cover letters in plain text."
+    fallback = (
+        f"Dear Hiring Team,\n\n"
+        f"I'm excited to apply for the {parsed_job.get('role', 'role')} position at {parsed_job.get('company', 'your company')}. "
+        f"My background aligns well with your needs in {', '.join(parsed_job.get('skills', [])[:4]) or 'the listed requirements'}.\n\n"
+        f"In my recent work, I have focused on delivering measurable outcomes, collaborating effectively, and learning quickly in fast-moving environments. "
+        f"I would welcome the chance to bring that same approach to {parsed_job.get('company', 'your team')}.\n\n"
+        f"Thank you for your time and consideration.\n"
+    )
+    try:
+        return nova_converse(system_prompt, json.dumps({"job": parsed_job, "resume_text": resume_text[:12000], "parsed_profile": parsed_profile, "settings": settings}), 0.45, 1800)
+    except Exception:
+        return fallback
+
+
+def fallback_tasks(parsed_job: Dict[str, Any], action: Optional[str] = None) -> List[Dict[str, Any]]:
+    base = [
+        {"title": f"Review {parsed_job.get('company', 'company')} job requirements", "details": "Validate skills, location, and seniority before applying.", "status": "open", "task_type": "research"},
+        {"title": f"Tailor resume for {parsed_job.get('role', 'target role')}", "details": "Move the most relevant impact bullets to the top.", "status": "open", "task_type": "resume"},
+    ]
+    if action == "mark_applied":
+        base.append({"title": f"Send follow-up for {parsed_job.get('company', 'company')}", "details": "Follow up in 5 business days if there is no response.", "status": "open", "task_type": "follow_up", "due_date": (datetime.now(timezone.utc).date() + timedelta(days=5)).isoformat()})
+    else:
+        base.append({"title": f"Prepare interview stories for {parsed_job.get('role', 'role')}", "details": "Draft STAR examples tied to role requirements.", "status": "open", "task_type": "interview_prep"})
+    return base
+
+
+def ai_suggest_tasks(parsed_job: Dict[str, Any], match_analysis: Dict[str, Any], action: Optional[str] = None) -> List[Dict[str, Any]]:
+    system_prompt = (
+        "Return ONLY valid JSON as an array of tasks. Each task schema: "
+        '{"title":string,"details":string,"status":"open","task_type":"follow_up|resume|cover_letter|interview_prep|briefing|research|other","due_date":string|null}'
+    )
+    try:
+        text = nova_converse(system_prompt, json.dumps({"job": parsed_job, "match": match_analysis, "action": action}), 0.2, 1600)
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            return parsed
+    except Exception:
+        pass
+    return fallback_tasks(parsed_job, action)
+
+
+def fetch_job_url(url: str) -> Dict[str, str]:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+    html = response.text
+    soup = BeautifulSoup(html, "html.parser")
+    for node in soup(["script", "style", "noscript", "svg"]):
+        node.extract()
+    text = "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
+    if len(text) < 120:
+        raise HTTPException(status_code=422, detail="Could not extract enough readable job description text from that page")
+    return {"html": html[:200000], "text": text[:60000]}
+
+
+def compact_jobs_for_prompt(jobs: List[Dict[str, Any]], limit: int = 60) -> List[Dict[str, Any]]:
+    return [
+        {
+            "id": job.get("id", ""),
+            "company": job.get("company", ""),
+            "role": job.get("role", ""),
+            "status": normalize_status(job.get("status", "Applied")),
+            "date": str(job.get("date", "")),
+            "notes": job.get("notes", "")[:240],
+            "salary": job.get("salary", ""),
+            "location": job.get("location", ""),
+            "skills": job.get("skills", []),
+            "ai_match_score": job.get("ai_match_score"),
+        }
+        for job in jobs[:limit]
+    ]
+
+
+def generate_daily_briefing(jobs: List[Dict[str, Any]], tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    stale = [job for job in jobs if job["status"] == "Applied" and (datetime.now(timezone.utc).date() - date.fromisoformat(str(job["date"]))).days >= 7]
+    open_tasks = [task for task in tasks if task["status"] != "done"]
+    return {
+        "summary": f"You have {len(open_tasks)} open tasks and {len(stale)} potentially stale applications.",
+        "stale_applications": stale[:5],
+        "focus_today": [task["title"] for task in open_tasks[:3]],
+        "follow_up_suggestions": [f"Check in on {job['company']} for {job['role']}" for job in stale[:3]],
+    }
+
+
+def load_context(db: Session) -> Dict[str, Any]:
+    state = StateService(db)
+    jobs = [JobResponse.model_validate(job).model_dump(mode="json") for job in JobService(db).list()]
+    tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
+    parsed_jobs = [item.parsed_job for item in IntakeService(db).recent(limit=6)]
+    documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()][:6]
+    return {
+        "stats": compute_job_stats(jobs),
+        "jobs": compact_jobs_for_prompt(jobs),
+        "parsed_jobs": parsed_jobs,
+        "resume_text": state.get("resume_text") or "",
+        "parsed_profile": state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
+        "keywords": state.get("keywords") or [],
+        "settings": state.get("settings") or DEFAULT_SETTINGS,
+        "tasks": tasks,
+        "documents": documents,
+        "last_sync": state.get("last_sync"),
+        "chat_history": ChatService(db).tail(limit=10),
+        "gmail_sync": gmail_sync_service.get_status(),
+        "daily_briefing": generate_daily_briefing(jobs, tasks),
+    }
+
+
+def deterministic_chat_answer(message: str, context: Dict[str, Any]) -> Optional[str]:
+    msg = message.lower().strip()
+    stats = context["stats"]
+    jobs = context["jobs"]
+    tasks = context["tasks"]
+    briefing = context["daily_briefing"]
+    if "daily briefing" in msg:
+        return f"{briefing['summary']} Focus today: {', '.join(briefing['focus_today']) or 'No urgent tasks.'}"
+    if "stale" in msg and "application" in msg:
+        items = briefing["stale_applications"]
+        if not items:
+            return "You have no stale applied jobs based on the current 7-day rule."
+        return "Potentially stale applications:\n" + "\n".join(f"- {job['company']} — {job['role']}" for job in items)
+    if "how many jobs" in msg or ("how many" in msg and "applied" in msg):
+        return f"You have {stats['total_jobs']} tracked jobs, including {stats['applied_count']} applied and {stats['wishlist_count']} wishlist items."
+    if "open tasks" in msg or ("how many" in msg and "tasks" in msg):
+        open_tasks = sum(1 for task in tasks if task["status"] != "done")
+        return f"You have {open_tasks} open tasks."
+    if "list my jobs" in msg or "show my jobs" in msg:
+        if not jobs:
+            return "You do not have any tracked jobs yet."
+        return "Here are your current jobs:\n" + "\n".join(f"- {job['company']} — {job['role']} [{job['status']}]" for job in jobs[:15])
+    return None
+
+
+def ai_chat(message: str, context: Dict[str, Any]) -> str:
+    shortcut = deterministic_chat_answer(message, context)
+    if shortcut:
+        return shortcut
+    system_prompt = (
+        "You are JobTracker AI, a private single-user career assistant. Answer only from the stored context. "
+        "Be practical, concise, and context-aware across jobs, parsed jobs, documents, profile, settings, keywords, chat history, and tasks. "
+        "If information is missing, say so clearly."
+    )
+    try:
+        return nova_converse(system_prompt, f"Stored context JSON:\n{json.dumps(context, ensure_ascii=False)}\n\nUser question: {message}", 0.1, 2000)
+    except Exception:
+        return "Nova is unavailable right now. I can still help with deterministic stats, stale applications, and task summaries from your saved data."
 
 
 def initialize_database() -> None:
@@ -413,17 +1051,11 @@ def decode_token(token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
 
 
-def get_token_from_request(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-) -> Optional[str]:
+def get_token_from_request(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)) -> Optional[str]:
     return request.cookies.get(COOKIE_NAME) or (credentials.credentials if credentials and credentials.scheme.lower() == "bearer" else None)
 
 
-def require_auth(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-) -> Dict[str, Any]:
+def require_auth(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)) -> Dict[str, Any]:
     token = get_token_from_request(request, credentials)
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -431,207 +1063,6 @@ def require_auth(
     if payload.get("sub", "").lower() != DASHBOARD_EMAIL:
         raise HTTPException(status_code=401, detail="Unauthorized user")
     return payload
-
-
-def normalize_status(status: str) -> str:
-    return STATUS_MAP.get((status or "").strip().lower(), "Applied")
-
-
-def compute_job_stats(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
-    counts = {status: 0 for status in STATUS_ORDER}
-    for job in jobs:
-        counts[normalize_status(job.get("status", "Applied"))] += 1
-    return {
-        "total_jobs": len(jobs),
-        "wishlist_count": counts["Wishlist"],
-        "applied_count": counts["Applied"],
-        "interview_count": counts["Interview"],
-        "offered_count": counts["Offered"],
-        "accepted_count": counts["Accepted"],
-        "rejected_count": counts["Rejected"],
-        "archived_count": counts["Archived"],
-        "by_status": counts,
-    }
-
-
-def compact_jobs_for_prompt(jobs: List[Dict[str, Any]], limit: int = 60) -> List[Dict[str, Any]]:
-    return [
-        {
-            "id": job.get("id", ""),
-            "company": job.get("company", ""),
-            "role": job.get("role", ""),
-            "status": normalize_status(job.get("status", "Applied")),
-            "date": job.get("date", ""),
-            "notes": job.get("notes", "")[:300],
-            "salary": job.get("salary", ""),
-            "sponsor": job.get("sponsor", ""),
-            "field": job.get("field", ""),
-            "link": job.get("link", ""),
-        }
-        for job in jobs[:limit]
-    ]
-
-
-def safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
-    try:
-        return json.loads(text)
-    except Exception:
-        match = re.search(r"\{.*\}", text or "", flags=re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                return None
-    return None
-
-
-def extract_text_from_bedrock_response(resp: Dict[str, Any]) -> str:
-    try:
-        return "\n".join(item["text"] for item in resp["output"]["message"]["content"] if "text" in item).strip()
-    except Exception:
-        return ""
-
-
-def nova_converse(system_prompt: str, user_prompt: str, temperature: float = 0.2) -> str:
-    try:
-        response = bedrock.converse(
-            modelId=NOVA_MODEL_ID,
-            system=[{"text": system_prompt}],
-            messages=[{"role": "user", "content": [{"text": user_prompt}]}],
-            inferenceConfig={"maxTokens": 1800, "temperature": temperature, "topP": 0.9},
-        )
-        text = extract_text_from_bedrock_response(response)
-        if not text:
-            raise RuntimeError("Empty response from Nova")
-        return text
-    except (ClientError, BotoCoreError, Exception) as exc:
-        if REQUIRE_NOVA:
-            raise HTTPException(status_code=500, detail=f"Nova error: {exc}") from exc
-        raise RuntimeError(f"Nova error: {exc}") from exc
-
-
-def fallback_resume_parse(resume_text: str) -> Dict[str, Any]:
-    text = resume_text.lower()
-    common_skills = [
-        "python", "sql", "java", "javascript", "typescript", "react", "node", "aws", "excel", "tableau",
-        "power bi", "pandas", "scikit-learn", "tensorflow", "fastapi", "docker", "git", "linux", "c++",
-        "machine learning", "data analysis",
-    ]
-    roles = [
-        "data analyst", "software engineer", "data engineer", "business analyst", "machine learning engineer",
-        "research assistant", "teaching assistant", "it analyst",
-    ]
-    years = re.findall(r"(\d+)\+?\s+year", text)
-    experience = ""
-    if years:
-        value = max(int(item) for item in years)
-        experience = "Entry Level" if value <= 1 else "Early Career" if value <= 3 else "Experienced"
-    elif any(token in text for token in ["intern", "graduate", "student"]):
-        experience = "Entry Level"
-    return {
-        "skills": sorted({skill.title() for skill in common_skills if skill in text}),
-        "roles": sorted({role.title() for role in roles if role in text}),
-        "experienceLevel": experience,
-        "domains": [],
-        "locations": [],
-        "education": [],
-    }
-
-
-def fallback_email_parse(email_text: str) -> Dict[str, Any]:
-    text = email_text.lower()
-    if any(token in text for token in ["interview", "phone screen", "next round", "schedule a call"]):
-        return {"status": "Interview", "reason": "The email mentions an interview or screening step."}
-    if any(token in text for token in ["offer", "compensation package", "pleased to offer"]):
-        return {"status": "Offered", "reason": "The email contains offer-related language."}
-    if any(token in text for token in ["welcome aboard", "glad to welcome", "accepted"]):
-        return {"status": "Accepted", "reason": "The email implies onboarding or acceptance."}
-    if any(token in text for token in ["regret to inform", "not moving forward", "unfortunately", "rejected"]):
-        return {"status": "Rejected", "reason": "The email contains rejection language."}
-    return {"status": "Applied", "reason": "No clear lifecycle change detected."}
-
-
-def load_context(db: Session) -> Dict[str, Any]:
-    state = StateService(db)
-    jobs = [JobResponse.model_validate(job).model_dump() for job in JobService(db).list()]
-    return {
-        "stats": compute_job_stats(jobs),
-        "jobs": compact_jobs_for_prompt(jobs),
-        "resume_text": state.get("resume_text") or "",
-        "parsed_profile": state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
-        "keywords": state.get("keywords") or [],
-        "settings": state.get("settings") or DEFAULT_SETTINGS,
-        "last_sync": state.get("last_sync"),
-        "chat_history": ChatService(db).tail(limit=8),
-        "gmail_sync": gmail_sync_service.get_status(),
-    }
-
-
-def deterministic_chat_answer(message: str, context: Dict[str, Any]) -> Optional[str]:
-    msg = message.lower().strip()
-    stats = context["stats"]
-    jobs = context["jobs"]
-    if "how many jobs" in msg or ("how many" in msg and "applied" in msg):
-        return (
-            f"You have {stats['total_jobs']} tracked jobs. Wishlist: {stats['wishlist_count']}, Applied: {stats['applied_count']}, "
-            f"Interview: {stats['interview_count']}, Offered: {stats['offered_count']}, Accepted: {stats['accepted_count']}, Rejected: {stats['rejected_count']}."
-        )
-    if "how many interviews" in msg:
-        return f"You currently have {stats['interview_count']} jobs in the Interview stage."
-    if "how many offers" in msg:
-        return f"You currently have {stats['offered_count']} jobs in the Offered stage."
-    if "list my jobs" in msg or "show my jobs" in msg:
-        if not jobs:
-            return "You do not have any tracked jobs yet."
-        return "Here are your current jobs:\n" + "\n".join(
-            f"- {job['company']} — {job['role']} [{job['status']}]" for job in jobs[:15]
-        )
-    return None
-
-
-def ai_parse_resume(resume_text: str) -> Dict[str, Any]:
-    system_prompt = (
-        "You are an expert resume parser. Return ONLY valid JSON using this schema: "
-        '{"skills":[string],"roles":[string],"experienceLevel":string,"domains":[string],"locations":[string],"education":[string]}'
-    )
-    try:
-        parsed = safe_json_loads(nova_converse(system_prompt, f"Parse this resume text:\n\n{resume_text}", 0.1))
-        if parsed:
-            for key, default in DEFAULT_PARSED_PROFILE.items():
-                parsed.setdefault(key, default)
-            return parsed
-    except Exception:
-        pass
-    return fallback_resume_parse(resume_text)
-
-
-def ai_parse_email(email_text: str) -> Dict[str, Any]:
-    system_prompt = (
-        "You classify recruiter emails into a job pipeline stage. Return ONLY valid JSON: "
-        '{"status":"Wishlist|Applied|Interview|Offered|Accepted|Rejected","reason":"short explanation"}'
-    )
-    try:
-        parsed = safe_json_loads(nova_converse(system_prompt, f"Classify this email:\n\n{email_text}", 0.0))
-        if parsed and parsed.get("status"):
-            return {"status": normalize_status(parsed["status"]), "reason": parsed.get("reason", "")}
-    except Exception:
-        pass
-    return fallback_email_parse(email_text)
-
-
-def ai_chat(message: str, context: Dict[str, Any]) -> str:
-    shortcut = deterministic_chat_answer(message, context)
-    if shortcut:
-        return shortcut
-    system_prompt = (
-        "You are JobTracker AI, a private dashboard assistant. Answer only from the provided stored context. "
-        "Do not invent jobs, settings, resume details, or counts. If data is missing, say so clearly."
-    )
-    user_prompt = f"Stored context JSON:\n{json.dumps(context, ensure_ascii=False)}\n\nUser question: {message}"
-    try:
-        return nova_converse(system_prompt, user_prompt, 0.1)
-    except Exception:
-        return "Nova is unavailable right now. Based on your saved dashboard context, I can still answer direct stats and job-list questions deterministically."
 
 
 @app.get("/", include_in_schema=False)
@@ -663,16 +1094,7 @@ def style_css():
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
     db.execute(select(1))
-    return {
-        "ok": True,
-        "app": APP_TITLE,
-        "environment": APP_ENV,
-        "port": PORT,
-        "database": "connected",
-        "region": AWS_REGION,
-        "model": NOVA_MODEL_ID,
-        "auth_configured": bool(DASHBOARD_EMAIL and (DASHBOARD_PASSWORD or DASHBOARD_PASSWORD_HASH)),
-    }
+    return {"ok": True, "app": APP_TITLE, "database": "connected", "region": AWS_REGION, "model": NOVA_MODEL_ID}
 
 
 @app.get("/robots.txt", include_in_schema=False)
@@ -686,15 +1108,7 @@ def login(payload: LoginRequest, response: Response):
     if email != DASHBOARD_EMAIL or not verify_password(payload.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(email)
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        secure=IS_PRODUCTION,
-        samesite="lax",
-        max_age=JWT_EXPIRE_HOURS * 3600,
-        path="/",
-    )
+    response.set_cookie(key=COOKIE_NAME, value=token, httponly=True, secure=IS_PRODUCTION, samesite="lax", max_age=JWT_EXPIRE_HOURS * 3600, path="/")
     return {"ok": True, "email": email}
 
 
@@ -711,9 +1125,10 @@ def auth_me(user: Dict[str, Any] = Depends(require_auth)):
 
 @app.get("/api/dashboard/simple")
 def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    jobs = [JobResponse.model_validate(job).model_dump() for job in JobService(db).list()]
+    jobs = [JobResponse.model_validate(job).model_dump(mode="json") for job in JobService(db).list()]
+    tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
     stats = compute_job_stats(jobs)
-    columns = {status: [] for status in STATUS_ORDER[:5]}
+    columns = {status: [] for status in ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Later"]}
     for job in jobs:
         if job["status"] in columns:
             columns[job["status"]].append(job)
@@ -721,34 +1136,142 @@ def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = De
         "stats": stats,
         "columns": columns,
         "recent_jobs": jobs[:8],
+        "recent_intakes": [item.parsed_job for item in IntakeService(db).recent(limit=4)],
         "profile_summary": StateService(db).get("parsed_profile") or DEFAULT_PARSED_PROFILE,
         "keywords": StateService(db).get("keywords") or [],
-        "last_sync": StateService(db).get("last_sync"),
+        "daily_briefing": generate_daily_briefing(jobs, tasks),
         "gmail_sync": gmail_sync_service.get_status(),
     }
 
 
 @app.get("/api/jobs")
 def get_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return [JobResponse.model_validate(job).model_dump() for job in JobService(db).list()]
+    return [JobResponse.model_validate(job).model_dump(mode="json") for job in JobService(db).list()]
 
 
 @app.post("/api/jobs")
 def add_job(payload: JobCreate, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     if not payload.company.strip() or not payload.role.strip():
         raise HTTPException(status_code=400, detail="Company and role are required")
-    return JobResponse.model_validate(JobService(db).create(payload)).model_dump()
+    return JobResponse.model_validate(JobService(db).create(payload)).model_dump(mode="json")
 
 
 @app.put("/api/jobs/{job_id}")
 def update_job(job_id: str, payload: JobUpdate, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return JobResponse.model_validate(JobService(db).update(job_id, payload)).model_dump()
+    return JobResponse.model_validate(JobService(db).update(job_id, payload)).model_dump(mode="json")
 
 
 @app.delete("/api/jobs/{job_id}")
 def delete_job(job_id: str, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     JobService(db).delete(job_id)
     return {"ok": True}
+
+
+@app.post("/api/jobs/parse-link")
+def parse_job_link(payload: ParseJobLinkRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    fetched = fetch_job_url(str(payload.url))
+    parsed_job = ai_parse_job_description(fetched["text"], str(payload.url))
+    state = StateService(db)
+    match_analysis = ai_match_resume(
+        parsed_job,
+        state.get("resume_text") or "",
+        state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
+        state.get("keywords") or [],
+    )
+    suggested_actions = [
+        {"id": "mark_applied", "label": "I applied", "description": "Create a tracked application and follow-up task."},
+        {"id": "save_wishlist", "label": "Save to wishlist", "description": "Save this opportunity for active review."},
+        {"id": "match_resume", "label": "Match my resume", "description": "Review fit, strengths, and gaps."},
+        {"id": "generate_resume", "label": "Generate resume", "description": "Draft a tailored resume version."},
+        {"id": "generate_cover_letter", "label": "Generate cover letter", "description": "Draft a targeted cover letter."},
+        {"id": "save_later", "label": "Save for later", "description": "Store the job with minimal follow-up pressure."},
+    ]
+    tasks = ai_suggest_tasks(parsed_job, match_analysis)
+    intake = IntakeService(db).create(str(payload.url), fetched["html"], fetched["text"], parsed_job, suggested_actions)
+    return {
+        "intake_id": intake.id,
+        "parsed_job": parsed_job,
+        "match_analysis": match_analysis,
+        "suggested_actions": suggested_actions,
+        "suggested_tasks": tasks,
+    }
+
+
+@app.post("/api/jobs/action")
+def apply_job_action(payload: JobActionRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    intake_service = IntakeService(db)
+    intake = db.get(JobIntakeRecord, payload.intake_id)
+    if intake is None:
+        raise HTTPException(status_code=404, detail="Job intake not found")
+    parsed_job = intake.parsed_job or {}
+    state = StateService(db)
+    match_analysis = ai_match_resume(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE, state.get("keywords") or [])
+    response: Dict[str, Any] = {"action": payload.action, "job": None, "document": None}
+    linked_job: Optional[JobRecord] = None
+
+    if payload.action in ACTION_TO_STATUS:
+        linked_job = JobService(db).create(JobCreate(
+            company=payload.company or parsed_job.get("company", "Unknown company"),
+            role=payload.role or parsed_job.get("role", "Unknown role"),
+            status=ACTION_TO_STATUS[payload.action],
+            date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            field=parsed_job.get("field", ""),
+            notes=parsed_job.get("summary", ""),
+            link=intake.url,
+            salary=parsed_job.get("salary", ""),
+            location=parsed_job.get("location", ""),
+            job_summary=parsed_job.get("summary", ""),
+            skills=parsed_job.get("skills", []),
+            source="parsed_link",
+            intake_id=intake.id,
+            ai_match_score=int(match_analysis.get("score", 0)) if match_analysis.get("score") is not None else None,
+            ai_match_summary=match_analysis.get("summary", ""),
+            metadata_json={"match_analysis": match_analysis},
+        ))
+        response["job"] = JobResponse.model_validate(linked_job).model_dump(mode="json")
+
+    if payload.action == "match_resume":
+        response["match_analysis"] = match_analysis
+    elif payload.action == "generate_resume":
+        content = ai_generate_tailored_resume(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE)
+        document = DocumentService(db).upsert_text_document(
+            name=f"Tailored Resume - {parsed_job.get('company', 'Target')}",
+            doc_type="tailored_resume",
+            content_text=content,
+            linked_job_id=linked_job.id if linked_job else None,
+            metadata_json={"intake_id": intake.id, "source_url": intake.url},
+        )
+        response["document"] = DocumentResponse.model_validate(document).model_dump(mode="json")
+        response["match_analysis"] = match_analysis
+    elif payload.action == "generate_cover_letter":
+        content = ai_generate_cover_letter(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE, state.get("settings") or DEFAULT_SETTINGS)
+        document = DocumentService(db).upsert_text_document(
+            name=f"Cover Letter - {parsed_job.get('company', 'Target')}",
+            doc_type="generated_cover_letter",
+            content_text=content,
+            linked_job_id=linked_job.id if linked_job else None,
+            metadata_json={"intake_id": intake.id, "source_url": intake.url},
+        )
+        response["document"] = DocumentResponse.model_validate(document).model_dump(mode="json")
+    created_tasks = TaskService(db).create_many(ai_suggest_tasks(parsed_job, match_analysis, payload.action), linked_job.id if linked_job else None)
+    intake_service.set_action(payload.intake_id, payload.action)
+    response["tasks"] = [TaskResponse.model_validate(task).model_dump(mode="json") for task in created_tasks]
+    return response
+
+
+@app.get("/api/tasks")
+def list_tasks(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
+
+
+@app.put("/api/tasks/{task_id}")
+def update_task(task_id: str, payload: TaskUpdateRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return TaskResponse.model_validate(TaskService(db).update_status(task_id, payload.status)).model_dump(mode="json")
+
+
+@app.get("/api/documents")
+def list_documents(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()]
 
 
 @app.post("/api/resume/analyze")
@@ -761,9 +1284,11 @@ def analyze_resume(req: ResumeAnalyzeRequest, _: Dict[str, Any] = Depends(requir
 def save_resume(req: ResumeSaveRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     state = StateService(db)
     state.set("resume_text", req.resume_text)
-    state.set("parsed_profile", req.parsed_profile or ai_parse_resume(req.resume_text))
+    parsed_profile = req.parsed_profile or ai_parse_resume(req.resume_text)
+    state.set("parsed_profile", parsed_profile)
+    DocumentService(db).upsert_text_document("Primary Resume", "resume", req.resume_text, metadata_json={"active": True})
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "parsed_profile": parsed_profile}
 
 
 @app.get("/api/profile")
@@ -773,6 +1298,7 @@ def get_profile(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends
         "resume_text": state.get("resume_text") or "",
         "parsed_profile": state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
         "chat_history": ChatService(db).tail(limit=12),
+        "documents": [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()],
     }
 
 
@@ -800,6 +1326,7 @@ def save_settings(req: SettingsRequest, _: Dict[str, Any] = Depends(require_auth
         "sync_window_hours": max(1, min(req.sync_window_hours, 168)),
         "preferred_location": req.preferred_location.strip(),
         "user_notes": req.user_notes.strip(),
+        "tone": req.tone.strip() or "concise",
     }
     state = StateService(db)
     state.set("settings", payload)
@@ -818,8 +1345,13 @@ def parse_email(req: EmailParseRequest, _: Dict[str, Any] = Depends(require_auth
             job.status = result["status"]
             job.updated_at = datetime.now(timezone.utc)
             db.commit()
-            linked_job = JobResponse.model_validate(job).model_dump()
+            linked_job = JobResponse.model_validate(job).model_dump(mode="json")
     return {"parsed": result, "job": linked_job}
+
+
+@app.get("/api/assistant/context")
+def assistant_context(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return load_context(db)
 
 
 @app.post("/api/chat")
@@ -829,8 +1361,8 @@ def chat(req: ChatRequest, _: Dict[str, Any] = Depends(require_auth), db: Sessio
     context = load_context(db)
     answer = ai_chat(req.message.strip(), context)
     chat_service = ChatService(db)
-    chat_service.append("user", req.message.strip())
-    chat_service.append("assistant", answer)
+    chat_service.append("user", req.message.strip(), context_type="chat")
+    chat_service.append("assistant", answer, context_type="chat")
     return {"answer": answer, "history": chat_service.tail(limit=12)}
 
 

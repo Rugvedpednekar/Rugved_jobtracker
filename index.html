@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JobTracker Dashboard</title>
+  <title>CareerOS Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -13,215 +13,262 @@
 </head>
 <body>
   <section id="login-screen" class="screen screen-login">
-    <div class="login-card panel">
-      <div class="brand-row">
-        <div class="brand-icon"><i data-lucide="briefcase-business"></i></div>
-        <div>
-          <h1>JobTracker</h1>
-          <p>Private Railway dashboard</p>
+    <div class="login-shell">
+      <div class="login-card panel">
+        <div class="brand-row">
+          <div class="brand-icon"><i data-lucide="sparkles"></i></div>
+          <div>
+            <p class="eyebrow">CareerOS</p>
+            <h1>AI career assistant</h1>
+            <p class="muted">FastAPI + Railway + Postgres + Bedrock</p>
+          </div>
         </div>
+        <div class="hero-points">
+          <div class="hero-pill">Parse job links instantly</div>
+          <div class="hero-pill">Tailor resumes with AI</div>
+          <div class="hero-pill">Stay on top of follow-ups</div>
+        </div>
+        <form id="login-form" class="stack-md">
+          <label class="label" for="login-email">Email</label>
+          <input id="login-email" class="field" type="email" placeholder="you@example.com" required />
+          <label class="label" for="login-password">Password</label>
+          <input id="login-password" class="field" type="password" placeholder="Enter password" required />
+          <button class="btn btn-primary" type="submit">Sign in</button>
+        </form>
+        <p id="login-error" class="message error hidden"></p>
       </div>
-      <div class="login-copy">
-        <h2>Sign in</h2>
-        <p>Use your configured dashboard credentials to access your job pipeline, resume profile, settings, and AI assistant.</p>
-      </div>
-      <form id="login-form" class="stack-md">
-        <label class="label" for="login-email">Email</label>
-        <input id="login-email" class="field" type="email" placeholder="you@example.com" required />
-        <label class="label" for="login-password">Password</label>
-        <input id="login-password" class="field" type="password" placeholder="Enter password" required />
-        <button class="btn btn-primary" type="submit">Login</button>
-      </form>
-      <p id="login-error" class="message error hidden"></p>
     </div>
   </section>
 
   <div id="app-shell" class="hidden">
-    <header class="topbar">
+    <aside class="sidebar panel">
       <div>
-        <p class="eyebrow">JobTracker</p>
-        <h1>Personal dashboard</h1>
-      </div>
-      <div class="topbar-actions">
-        <nav class="nav-group">
-          <button class="nav-btn active" data-section="tracker">Tracker</button>
-          <button class="nav-btn" data-section="jobs">Jobs</button>
-          <button class="nav-btn" data-section="profile">Profile</button>
-          <button class="nav-btn" data-section="docs">Docs</button>
-          <button class="nav-btn" data-section="settings">Settings</button>
-        </nav>
-        <button id="logout-btn" class="btn btn-secondary" type="button">Logout</button>
-      </div>
-    </header>
-
-    <main class="layout">
-      <section id="tracker" class="section-panel active stack-lg">
-        <div class="section-head">
+        <div class="brand-row brand-row-sidebar">
+          <div class="brand-icon small"><i data-lucide="briefcase-business"></i></div>
           <div>
-            <p class="eyebrow">Overview</p>
-            <h2>Tracker overview</h2>
+            <p class="eyebrow">CareerOS</p>
+            <h2>Personal assistant</h2>
           </div>
-          <button id="refresh-dashboard-btn" class="btn btn-secondary" type="button">Refresh</button>
         </div>
+        <nav class="nav-stack">
+          <button class="nav-btn active" data-section="tracker"><i data-lucide="layout-dashboard"></i><span>Tracker</span></button>
+          <button class="nav-btn" data-section="jobs"><i data-lucide="briefcase"></i><span>Jobs</span></button>
+          <button class="nav-btn" data-section="profile"><i data-lucide="user-round"></i><span>Profile</span></button>
+          <button class="nav-btn" data-section="docs"><i data-lucide="files"></i><span>Docs</span></button>
+          <button class="nav-btn" data-section="settings"><i data-lucide="sliders-horizontal"></i><span>Settings</span></button>
+        </nav>
+      </div>
+      <button id="logout-btn" class="btn btn-secondary full-width" type="button">Logout</button>
+    </aside>
 
-        <div class="stats-grid">
-          <article class="panel stat-card"><span>Total</span><strong id="total-count">0</strong></article>
-          <article class="panel stat-card"><span>Wishlist</span><strong id="wishlist-count">0</strong></article>
-          <article class="panel stat-card"><span>Applied</span><strong id="applied-count">0</strong></article>
-          <article class="panel stat-card"><span>Interview</span><strong id="interview-count">0</strong></article>
-          <article class="panel stat-card"><span>Offered</span><strong id="offered-count">0</strong></article>
-          <article class="panel stat-card"><span>Accepted</span><strong id="accepted-count">0</strong></article>
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">AI-heavy job tracker</p>
+          <h1>Career command center</h1>
         </div>
+        <div class="topbar-actions">
+          <div class="topbar-chip"><i data-lucide="calendar-days"></i><span id="briefing-summary">Loading briefing...</span></div>
+        </div>
+      </header>
 
-        <div class="panel">
-          <div class="section-head compact">
+      <main class="layout">
+        <section id="tracker" class="section-panel active stack-lg">
+          <div class="hero-grid">
+            <article class="panel hero-card stack-md">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow">Daily briefing</p>
+                  <h2>Focus for today</h2>
+                </div>
+                <button id="refresh-dashboard-btn" class="btn btn-secondary" type="button">Refresh</button>
+              </div>
+              <p id="daily-briefing-text" class="hero-copy">Loading...</p>
+              <div class="briefing-lists">
+                <div>
+                  <p class="label">Suggested follow-ups</p>
+                  <div id="followup-list" class="list-stack"></div>
+                </div>
+                <div>
+                  <p class="label">Top tasks</p>
+                  <div id="focus-list" class="list-stack"></div>
+                </div>
+              </div>
+            </article>
+            <article class="panel parse-card stack-md">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow">Smart intake</p>
+                  <h3>Paste a job link</h3>
+                </div>
+                <button id="open-parse-job" class="btn btn-primary" type="button">Paste Job Link</button>
+              </div>
+              <p class="muted">Parse a live job page, structure the role, compare it to your resume, and trigger the next best action.</p>
+              <div id="recent-intakes" class="list-stack"></div>
+            </article>
+          </div>
+
+          <div class="stats-grid">
+            <article class="panel stat-card"><span>Total</span><strong id="total-count">0</strong></article>
+            <article class="panel stat-card"><span>Wishlist</span><strong id="wishlist-count">0</strong></article>
+            <article class="panel stat-card"><span>Applied</span><strong id="applied-count">0</strong></article>
+            <article class="panel stat-card"><span>Interview</span><strong id="interview-count">0</strong></article>
+            <article class="panel stat-card"><span>Offered</span><strong id="offered-count">0</strong></article>
+            <article class="panel stat-card"><span>Accepted</span><strong id="accepted-count">0</strong></article>
+          </div>
+
+          <div class="tracker-grid">
+            <div class="panel">
+              <div class="section-head compact"><h3>Pipeline snapshot</h3></div>
+              <div class="board-grid">
+                <div class="board-column"><div class="board-head"><span>Wishlist</span><span id="wishlist-badge" class="badge">0</span></div><div id="wishlist-column" class="board-list"></div></div>
+                <div class="board-column"><div class="board-head"><span>Applied</span><span id="applied-badge" class="badge">0</span></div><div id="applied-column" class="board-list"></div></div>
+                <div class="board-column"><div class="board-head"><span>Interview</span><span id="interview-badge" class="badge">0</span></div><div id="interview-column" class="board-list"></div></div>
+                <div class="board-column"><div class="board-head"><span>Offered</span><span id="offered-badge" class="badge">0</span></div><div id="offered-column" class="board-list"></div></div>
+                <div class="board-column"><div class="board-head"><span>Accepted</span><span id="accepted-badge" class="badge">0</span></div><div id="accepted-column" class="board-list"></div></div>
+                <div class="board-column"><div class="board-head"><span>Later</span><span id="later-badge" class="badge">0</span></div><div id="later-column" class="board-list"></div></div>
+              </div>
+            </div>
+            <div class="panel stack-md">
+              <div class="section-head compact"><h3>AI task queue</h3></div>
+              <div id="tasks-list" class="task-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="jobs" class="section-panel stack-lg hidden">
+          <div class="section-head">
             <div>
               <p class="eyebrow">Pipeline</p>
-              <h3>Kanban snapshot</h3>
+              <h2>Jobs</h2>
+            </div>
+            <div class="inline-actions">
+              <button id="jobs-refresh-btn" class="btn btn-secondary" type="button">Refresh</button>
+              <button id="open-parse-job-jobs" class="btn btn-primary" type="button">Paste Job Link</button>
+              <button id="open-add-job" class="btn btn-secondary" type="button">Add job</button>
             </div>
           </div>
-          <div class="board-grid">
-            <div class="board-column"><div class="board-head"><span>Wishlist</span><span id="wishlist-badge" class="badge">0</span></div><div id="wishlist-column" class="board-list"></div></div>
-            <div class="board-column"><div class="board-head"><span>Applied</span><span id="applied-badge" class="badge">0</span></div><div id="applied-column" class="board-list"></div></div>
-            <div class="board-column"><div class="board-head"><span>Interview</span><span id="interview-badge" class="badge">0</span></div><div id="interview-column" class="board-list"></div></div>
-            <div class="board-column"><div class="board-head"><span>Offered</span><span id="offered-badge" class="badge">0</span></div><div id="offered-column" class="board-list"></div></div>
-            <div class="board-column"><div class="board-head"><span>Accepted</span><span id="accepted-badge" class="badge">0</span></div><div id="accepted-column" class="board-list"></div></div>
+          <div class="panel filters-grid">
+            <input id="jobs-search-input" class="field" type="search" placeholder="Search company, role, notes" />
+            <select id="jobs-status-filter" class="field">
+              <option value="">All statuses</option>
+              <option>Wishlist</option>
+              <option>Applied</option>
+              <option>Interview</option>
+              <option>Offered</option>
+              <option>Accepted</option>
+              <option>Rejected</option>
+              <option>Archived</option>
+              <option>Later</option>
+            </select>
           </div>
-        </div>
-      </section>
+          <div id="jobs-list" class="jobs-table"></div>
+        </section>
 
-      <section id="jobs" class="section-panel stack-lg hidden">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Pipeline</p>
-            <h2>Jobs list</h2>
+        <section id="profile" class="section-panel stack-lg hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Resume context</p>
+              <h2>Profile and resume</h2>
+            </div>
+            <div class="inline-actions">
+              <button id="analyze-resume-btn" class="btn btn-secondary" type="button">Analyze resume</button>
+              <button id="save-resume-btn" class="btn btn-primary" type="button">Save profile</button>
+            </div>
           </div>
-          <div class="inline-actions">
-            <button id="jobs-refresh-btn" class="btn btn-secondary" type="button">Refresh</button>
-            <button id="open-add-job" class="btn btn-primary" type="button">Add job</button>
-          </div>
-        </div>
-        <div class="panel filters-grid">
-          <input id="jobs-search-input" class="field" type="search" placeholder="Search company, role, notes" />
-          <select id="jobs-status-filter" class="field">
-            <option value="">All statuses</option>
-            <option>Wishlist</option>
-            <option>Applied</option>
-            <option>Interview</option>
-            <option>Offered</option>
-            <option>Accepted</option>
-            <option>Rejected</option>
-            <option>Archived</option>
-          </select>
-        </div>
-        <div id="jobs-list" class="jobs-table"></div>
-      </section>
-
-      <section id="profile" class="section-panel stack-lg hidden">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Resume context</p>
-            <h2>Profile and resume</h2>
-          </div>
-          <div class="inline-actions">
-            <button id="analyze-resume-btn" class="btn btn-secondary" type="button">Analyze resume</button>
-            <button id="save-resume-btn" class="btn btn-primary" type="button">Save profile</button>
-          </div>
-        </div>
-        <div class="panel stack-md">
-          <label class="label" for="resume-box">Resume text</label>
-          <textarea id="resume-box" class="field textarea-lg" placeholder="Paste resume text here"></textarea>
-        </div>
-        <div class="two-column">
-          <div class="panel stack-md">
-            <div class="section-head compact"><h3>Parsed profile</h3></div>
-            <pre id="parsed-profile-output" class="code-block">{}</pre>
-          </div>
-          <div class="panel stack-md">
-            <div class="section-head compact">
-              <div>
-                <p class="eyebrow">Matching context</p>
-                <h3>Keywords</h3>
+          <div class="profile-grid">
+            <div class="panel stack-md">
+              <label class="label" for="resume-box">Resume text</label>
+              <textarea id="resume-box" class="field textarea-xl" placeholder="Paste resume text here"></textarea>
+            </div>
+            <div class="stack-lg">
+              <div class="panel stack-md">
+                <div class="section-head compact"><h3>Parsed profile</h3></div>
+                <pre id="parsed-profile-output" class="code-block">{}</pre>
               </div>
-              <button id="save-keywords-btn" class="btn btn-secondary" type="button">Save keywords</button>
-            </div>
-            <textarea id="keyword-box" class="field textarea-md" placeholder="One keyword per line"></textarea>
-          </div>
-        </div>
-      </section>
-
-      <section id="docs" class="section-panel stack-lg hidden">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Documents</p>
-            <h2>Docs and recruiter email tools</h2>
-          </div>
-        </div>
-        <div class="two-column">
-          <div class="panel stack-md">
-            <h3>Document uploads</h3>
-            <p class="muted">Frontend file pickers are wired up now so you can choose files locally before a later storage integration.</p>
-            <input id="resume-upload" type="file" class="hidden" accept=".pdf,.doc,.docx,.txt" />
-            <input id="cover-letter-upload" type="file" class="hidden" accept=".pdf,.doc,.docx,.txt" />
-            <button id="resume-upload-btn" class="btn btn-secondary" type="button">Choose resume file</button>
-            <p id="resume-upload-status" class="message">No file selected.</p>
-            <button id="cover-letter-upload-btn" class="btn btn-secondary" type="button">Choose cover letter file</button>
-            <p id="cover-letter-upload-status" class="message">No file selected.</p>
-          </div>
-          <div class="panel stack-md">
-            <div class="section-head compact">
-              <div>
-                <p class="eyebrow">Recruiter email</p>
-                <h3>Parse email</h3>
-              </div>
-              <button id="parse-email-btn" class="btn btn-primary" type="button">Parse email</button>
-            </div>
-            <textarea id="email-parser-input" class="field textarea-md" placeholder="Paste recruiter email text here"></textarea>
-            <select id="email-job-link" class="field"><option value="">Optionally link to a job</option></select>
-            <div class="result-card">
-              <p><strong>Status:</strong> <span id="parsed-email-status">-</span></p>
-              <p><strong>Reason:</strong> <span id="parsed-email-reason">-</span></p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="settings" class="section-panel stack-lg hidden">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Preferences</p>
-            <h2>Settings and assistant</h2>
-          </div>
-          <button id="save-settings-btn" class="btn btn-primary" type="button">Save settings</button>
-        </div>
-        <div class="two-column">
-          <div class="panel stack-md">
-            <label class="label" for="sync-window">Sync window (hours)</label>
-            <input id="sync-window" class="field" type="number" min="1" max="168" />
-            <label class="label" for="preferred-location">Preferred location</label>
-            <input id="preferred-location" class="field" type="text" placeholder="Remote, NYC, Seattle..." />
-            <label class="label" for="user-notes">Notes</label>
-            <textarea id="user-notes" class="field textarea-md" placeholder="Preferences, reminders, search strategy"></textarea>
-            <div class="result-card">
-              <p><strong>Future Gmail sync:</strong> <span id="gmail-sync-status">Not configured</span></p>
-            </div>
-          </div>
-          <div class="panel chat-panel">
-            <div class="section-head compact">
-              <div>
-                <p class="eyebrow">Assistant</p>
-                <h3>Chat with saved context</h3>
+              <div class="panel stack-md">
+                <div class="section-head compact">
+                  <div>
+                    <p class="eyebrow">Matching context</p>
+                    <h3>Keywords</h3>
+                  </div>
+                  <button id="save-keywords-btn" class="btn btn-secondary" type="button">Save keywords</button>
+                </div>
+                <textarea id="keyword-box" class="field textarea-md" placeholder="One keyword per line"></textarea>
               </div>
             </div>
-            <div id="chat-messages" class="chat-messages"></div>
-            <form id="chat-form" class="chat-form">
-              <input id="chat-input" class="field" type="text" placeholder="Ask about jobs, resume, keywords, or settings" required />
-              <button class="btn btn-primary" type="submit">Send</button>
-            </form>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+
+        <section id="docs" class="section-panel stack-lg hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Generated assets</p>
+              <h2>Documents and recruiter tools</h2>
+            </div>
+          </div>
+          <div class="docs-grid">
+            <div class="panel stack-md">
+              <div class="section-head compact"><h3>Saved documents</h3></div>
+              <div id="documents-list" class="document-list"></div>
+            </div>
+            <div class="panel stack-md">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow">Recruiter email</p>
+                  <h3>Parse email</h3>
+                </div>
+                <button id="parse-email-btn" class="btn btn-primary" type="button">Parse email</button>
+              </div>
+              <textarea id="email-parser-input" class="field textarea-md" placeholder="Paste recruiter email text here"></textarea>
+              <select id="email-job-link" class="field"><option value="">Optionally link to a job</option></select>
+              <div class="result-card">
+                <p><strong>Status:</strong> <span id="parsed-email-status">-</span></p>
+                <p><strong>Reason:</strong> <span id="parsed-email-reason">-</span></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings" class="section-panel stack-lg hidden">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Preferences</p>
+              <h2>Settings and assistant</h2>
+            </div>
+            <button id="save-settings-btn" class="btn btn-primary" type="button">Save settings</button>
+          </div>
+          <div class="settings-grid">
+            <div class="panel stack-md">
+              <label class="label" for="sync-window">Sync window (hours)</label>
+              <input id="sync-window" class="field" type="number" min="1" max="168" />
+              <label class="label" for="preferred-location">Preferred location</label>
+              <input id="preferred-location" class="field" type="text" placeholder="Remote, NYC, Seattle..." />
+              <label class="label" for="tone-setting">Assistant tone</label>
+              <input id="tone-setting" class="field" type="text" placeholder="Concise, confident, direct" />
+              <label class="label" for="user-notes">Notes</label>
+              <textarea id="user-notes" class="field textarea-md" placeholder="Preferences, reminders, search strategy"></textarea>
+              <div class="result-card">
+                <p><strong>Future Gmail sync:</strong> <span id="gmail-sync-status">Not configured</span></p>
+              </div>
+            </div>
+            <div class="panel chat-panel">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow">Assistant</p>
+                  <h3>Chat with saved context</h3>
+                </div>
+              </div>
+              <div id="chat-messages" class="chat-messages"></div>
+              <form id="chat-form" class="chat-form">
+                <input id="chat-input" class="field" type="text" placeholder="Ask about jobs, parsed roles, tasks, resume fit, or settings" required />
+                <button class="btn btn-primary" type="submit">Send</button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <div id="add-job-modal" class="modal hidden">
@@ -233,26 +280,86 @@
       <form id="add-job-form" class="stack-md">
         <input name="company" class="field" type="text" placeholder="Company" required />
         <input name="role" class="field" type="text" placeholder="Role" required />
-        <select name="status" class="field">
-          <option>Wishlist</option>
-          <option selected>Applied</option>
-          <option>Interview</option>
-          <option>Offered</option>
-          <option>Accepted</option>
-          <option>Rejected</option>
-          <option>Archived</option>
-        </select>
-        <input name="date" class="field" type="date" />
+        <div class="two-column compact-grid">
+          <select name="status" class="field">
+            <option>Wishlist</option>
+            <option selected>Applied</option>
+            <option>Interview</option>
+            <option>Offered</option>
+            <option>Accepted</option>
+            <option>Rejected</option>
+            <option>Archived</option>
+            <option>Later</option>
+          </select>
+          <input name="date" class="field" type="date" />
+        </div>
+        <div class="two-column compact-grid">
+          <input name="location" class="field" type="text" placeholder="Location" />
+          <input name="salary" class="field" type="text" placeholder="Salary" />
+        </div>
         <input name="field" class="field" type="text" placeholder="Field" />
-        <input name="sponsor" class="field" type="text" placeholder="Sponsorship status" />
-        <input name="salary" class="field" type="text" placeholder="Salary" />
         <input name="link" class="field" type="url" placeholder="Job link" />
+        <textarea name="job_summary" class="field textarea-md" placeholder="Summary"></textarea>
         <textarea name="notes" class="field textarea-md" placeholder="Notes"></textarea>
         <div class="inline-actions end">
           <button id="cancel-add-job-modal" class="btn btn-ghost" type="button">Cancel</button>
           <button class="btn btn-primary" type="submit">Save job</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="parse-job-modal" class="modal hidden">
+    <div class="modal-card panel modal-wide">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">AI intake</p>
+          <h3>Paste job URL</h3>
+        </div>
+        <button id="close-parse-job-modal" class="btn btn-ghost" type="button">Close</button>
+      </div>
+      <div class="stack-md">
+        <div class="inline-actions">
+          <input id="job-url-input" class="field" type="url" placeholder="https://company.com/jobs/role" />
+          <button id="parse-job-btn" class="btn btn-primary" type="button">Parse link</button>
+        </div>
+        <div id="parse-loading" class="message hidden">Parsing job description and generating suggestions...</div>
+        <div id="parse-job-results" class="stack-lg hidden">
+          <div class="parse-results-grid">
+            <div class="panel inset-panel stack-md">
+              <div class="section-head compact"><h3>Parsed job</h3></div>
+              <div class="metric-grid">
+                <div class="metric-card"><span>Company</span><strong id="parsed-company">-</strong></div>
+                <div class="metric-card"><span>Role</span><strong id="parsed-role">-</strong></div>
+                <div class="metric-card"><span>Location</span><strong id="parsed-location">-</strong></div>
+                <div class="metric-card"><span>Match score</span><strong id="parsed-match-score">-</strong></div>
+              </div>
+              <div class="stack-md">
+                <div>
+                  <p class="label">Skills</p>
+                  <div id="parsed-skills" class="chip-row"></div>
+                </div>
+                <div>
+                  <p class="label">Summary</p>
+                  <p id="parsed-summary" class="muted">-</p>
+                </div>
+                <div>
+                  <p class="label">Resume match summary</p>
+                  <p id="parsed-match-summary" class="muted">-</p>
+                </div>
+              </div>
+            </div>
+            <div class="panel inset-panel stack-md">
+              <div class="section-head compact"><h3>Choose next action</h3></div>
+              <div id="job-actions" class="action-grid"></div>
+              <div>
+                <p class="label">Generated output</p>
+                <pre id="generated-output" class="code-block output-block">Select an action to create AI output.</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
