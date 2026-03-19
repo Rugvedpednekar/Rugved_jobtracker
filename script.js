@@ -1,12 +1,17 @@
 const API_BASE = "";
-const STATUS_ORDER = ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Rejected", "Archived"];
+const STATUS_ORDER = ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Rejected", "Archived", "Later"];
+const TASK_STATUSES = ["open", "in_progress", "done"];
 
 const state = {
   jobs: [],
+  tasks: [],
+  documents: [],
   parsedProfile: {},
   settings: {},
   dashboard: null,
-  chatHistory: []
+  chatHistory: [],
+  currentIntake: null,
+  parsing: false,
 };
 
 const dom = {
@@ -27,6 +32,22 @@ const dom = {
   addJobForm: document.getElementById("add-job-form"),
   closeAddJobModal: document.getElementById("close-add-job-modal"),
   cancelAddJobModal: document.getElementById("cancel-add-job-modal"),
+  openParseJobBtns: [document.getElementById("open-parse-job"), document.getElementById("open-parse-job-jobs")],
+  parseJobModal: document.getElementById("parse-job-modal"),
+  closeParseJobModal: document.getElementById("close-parse-job-modal"),
+  jobUrlInput: document.getElementById("job-url-input"),
+  parseJobBtn: document.getElementById("parse-job-btn"),
+  parseLoading: document.getElementById("parse-loading"),
+  parseJobResults: document.getElementById("parse-job-results"),
+  parsedCompany: document.getElementById("parsed-company"),
+  parsedRole: document.getElementById("parsed-role"),
+  parsedLocation: document.getElementById("parsed-location"),
+  parsedMatchScore: document.getElementById("parsed-match-score"),
+  parsedSkills: document.getElementById("parsed-skills"),
+  parsedSummary: document.getElementById("parsed-summary"),
+  parsedMatchSummary: document.getElementById("parsed-match-summary"),
+  jobActions: document.getElementById("job-actions"),
+  generatedOutput: document.getElementById("generated-output"),
   jobsSearchInput: document.getElementById("jobs-search-input"),
   jobsStatusFilter: document.getElementById("jobs-status-filter"),
   jobsList: document.getElementById("jobs-list"),
@@ -41,11 +62,20 @@ const dom = {
   interviewBadge: document.getElementById("interview-badge"),
   offeredBadge: document.getElementById("offered-badge"),
   acceptedBadge: document.getElementById("accepted-badge"),
+  laterBadge: document.getElementById("later-badge"),
   wishlistColumn: document.getElementById("wishlist-column"),
   appliedColumn: document.getElementById("applied-column"),
   interviewColumn: document.getElementById("interview-column"),
   offeredColumn: document.getElementById("offered-column"),
   acceptedColumn: document.getElementById("accepted-column"),
+  laterColumn: document.getElementById("later-column"),
+  tasksList: document.getElementById("tasks-list"),
+  documentsList: document.getElementById("documents-list"),
+  recentIntakes: document.getElementById("recent-intakes"),
+  briefingSummary: document.getElementById("briefing-summary"),
+  dailyBriefingText: document.getElementById("daily-briefing-text"),
+  followupList: document.getElementById("followup-list"),
+  focusList: document.getElementById("focus-list"),
   resumeBox: document.getElementById("resume-box"),
   parsedProfileOutput: document.getElementById("parsed-profile-output"),
   analyzeResumeBtn: document.getElementById("analyze-resume-btn"),
@@ -54,15 +84,10 @@ const dom = {
   saveKeywordsBtn: document.getElementById("save-keywords-btn"),
   syncWindow: document.getElementById("sync-window"),
   preferredLocation: document.getElementById("preferred-location"),
+  toneSetting: document.getElementById("tone-setting"),
   userNotes: document.getElementById("user-notes"),
   saveSettingsBtn: document.getElementById("save-settings-btn"),
   gmailSyncStatus: document.getElementById("gmail-sync-status"),
-  resumeUpload: document.getElementById("resume-upload"),
-  resumeUploadBtn: document.getElementById("resume-upload-btn"),
-  resumeUploadStatus: document.getElementById("resume-upload-status"),
-  coverLetterUpload: document.getElementById("cover-letter-upload"),
-  coverLetterUploadBtn: document.getElementById("cover-letter-upload-btn"),
-  coverLetterUploadStatus: document.getElementById("cover-letter-upload-status"),
   emailParserInput: document.getElementById("email-parser-input"),
   emailJobLink: document.getElementById("email-job-link"),
   parsedEmailStatus: document.getElementById("parsed-email-status"),
@@ -77,7 +102,16 @@ function showToast(message) {
   if (!dom.toast) return;
   dom.toast.textContent = message;
   dom.toast.classList.remove("hidden");
-  setTimeout(() => dom.toast.classList.add("hidden"), 2400);
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => dom.toast.classList.add("hidden"), 2400);
+}
+
+function safeText(value, fallback = "—") {
+  return value || fallback;
+}
+
+function emptyState(message) {
+  return `<div class="panel empty-state">${message}</div>`;
 }
 
 function showLogin() {
@@ -92,7 +126,6 @@ function showApp() {
 
 function setSection(sectionId) {
   dom.panels.forEach(panel => panel.classList.toggle("hidden", panel.id !== sectionId));
-  dom.panels.forEach(panel => panel.classList.toggle("active", panel.id === sectionId));
   dom.navButtons.forEach(button => button.classList.toggle("active", button.dataset.section === sectionId));
 }
 
@@ -120,37 +153,34 @@ async function api(path, options = {}) {
   return data;
 }
 
-function formatDate(dateText) {
-  if (!dateText) return "—";
-  return dateText;
-}
-
-function emptyState(message) {
-  return `<div class="panel empty-state">${message}</div>`;
-}
-
 function normalizeKeywordLines(text) {
-  return text
-    .split(/\n|,/)
-    .map(item => item.trim())
-    .filter(Boolean);
+  return text.split(/\n|,/).map(item => item.trim()).filter(Boolean);
+}
+
+function renderChips(items = []) {
+  if (!items.length) return `<span class="muted">No items yet.</span>`;
+  return items.map(item => `<span class="chip">${item}</span>`).join("");
 }
 
 function renderTrackerCard(job) {
   return `
     <article class="job-card-mini">
-      <div>
-        <h4>${job.company || "Unknown company"}</h4>
-        <p>${job.role || "Unknown role"}</p>
+      <h4>${safeText(job.company, "Unknown company")}</h4>
+      <p>${safeText(job.role, "Unknown role")}</p>
+      <div class="chip-row">
+        <span class="status-pill">${safeText(job.status, "Applied")}</span>
+        ${job.ai_match_score ? `<span class="chip">Match ${job.ai_match_score}%</span>` : ""}
       </div>
-      <span class="status-pill">${job.status || "Applied"}</span>
-      <small>${formatDate(job.date)}</small>
     </article>
   `;
 }
 
+function renderBoardColumn(element, items, label) {
+  element.innerHTML = items.length ? items.map(renderTrackerCard).join("") : emptyState(`No ${label.toLowerCase()} jobs yet.`);
+}
+
 function renderDashboard() {
-  const data = state.dashboard || { stats: {}, columns: {} };
+  const data = state.dashboard || { stats: {}, columns: {}, daily_briefing: {} };
   const stats = data.stats || {};
   dom.totalCount.textContent = stats.total_jobs || 0;
   dom.wishlistCount.textContent = stats.wishlist_count || 0;
@@ -163,26 +193,34 @@ function renderDashboard() {
   dom.interviewBadge.textContent = stats.interview_count || 0;
   dom.offeredBadge.textContent = stats.offered_count || 0;
   dom.acceptedBadge.textContent = stats.accepted_count || 0;
+  dom.laterBadge.textContent = stats.later_count || 0;
+  renderBoardColumn(dom.wishlistColumn, data.columns?.Wishlist || [], "Wishlist");
+  renderBoardColumn(dom.appliedColumn, data.columns?.Applied || [], "Applied");
+  renderBoardColumn(dom.interviewColumn, data.columns?.Interview || [], "Interview");
+  renderBoardColumn(dom.offeredColumn, data.columns?.Offered || [], "Offered");
+  renderBoardColumn(dom.acceptedColumn, data.columns?.Accepted || [], "Accepted");
+  renderBoardColumn(dom.laterColumn, data.columns?.Later || [], "Later");
 
-  const columns = {
-    Wishlist: dom.wishlistColumn,
-    Applied: dom.appliedColumn,
-    Interview: dom.interviewColumn,
-    Offered: dom.offeredColumn,
-    Accepted: dom.acceptedColumn
-  };
-
-  Object.entries(columns).forEach(([status, element]) => {
-    const items = data.columns?.[status] || [];
-    element.innerHTML = items.length ? items.map(renderTrackerCard).join("") : emptyState(`No ${status.toLowerCase()} jobs yet.`);
-  });
+  const briefing = data.daily_briefing || {};
+  dom.briefingSummary.textContent = briefing.summary || "No briefing available yet.";
+  dom.dailyBriefingText.textContent = briefing.summary || "No briefing available yet.";
+  dom.followupList.innerHTML = (briefing.follow_up_suggestions || []).length
+    ? briefing.follow_up_suggestions.map(item => `<div class="list-item">${item}</div>`).join("")
+    : emptyState("No follow-ups suggested yet.");
+  dom.focusList.innerHTML = (briefing.focus_today || []).length
+    ? briefing.focus_today.map(item => `<div class="list-item">${item}</div>`).join("")
+    : emptyState("No focus items yet.");
+  dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
+    ? data.recent_intakes.map(item => `<div class="list-item"><strong>${safeText(item.company)}</strong><p class="muted">${safeText(item.role)} • ${safeText(item.location, "Location pending")}</p></div>`).join("")
+    : emptyState("Parsed jobs will appear here.");
 }
 
 function filteredJobs() {
   const query = dom.jobsSearchInput.value.trim().toLowerCase();
   const statusFilter = dom.jobsStatusFilter.value;
   return state.jobs.filter(job => {
-    const matchesQuery = !query || [job.company, job.role, job.notes, job.field, job.sponsor].some(value => (value || "").toLowerCase().includes(query));
+    const haystack = [job.company, job.role, job.notes, job.field, job.location, job.job_summary].join(" ").toLowerCase();
+    const matchesQuery = !query || haystack.includes(query);
     const matchesStatus = !statusFilter || job.status === statusFilter;
     return matchesQuery && matchesStatus;
   });
@@ -194,31 +232,27 @@ function renderJobsList() {
     dom.jobsList.innerHTML = emptyState("No jobs match the current filters.");
     return;
   }
-
   dom.jobsList.innerHTML = `
     <div class="table-head table-row">
       <span>Company / Role</span>
       <span>Status</span>
-      <span>Date</span>
-      <span>Details</span>
+      <span>Location</span>
+      <span>Match</span>
       <span>Actions</span>
     </div>
     ${jobs.map(job => `
       <div class="table-row" data-job-id="${job.id}">
         <div>
-          <strong>${job.company}</strong>
-          <p>${job.role}</p>
+          <strong>${safeText(job.company)}</strong>
+          <p class="muted">${safeText(job.role)}<br>${safeText(job.job_summary, "No summary saved")}</p>
         </div>
         <div>
           <select class="field job-status-select" data-action="status">
             ${STATUS_ORDER.map(status => `<option value="${status}" ${job.status === status ? "selected" : ""}>${status}</option>`).join("")}
           </select>
         </div>
-        <div>${formatDate(job.date)}</div>
-        <div class="table-details">
-          <p>${job.field || "—"}</p>
-          <p>${job.salary || "—"}</p>
-        </div>
+        <div>${safeText(job.location)}</div>
+        <div>${job.ai_match_score ? `${job.ai_match_score}%` : "—"}</div>
         <div class="inline-actions">
           <button class="btn btn-ghost" data-action="delete" type="button">Delete</button>
         </div>
@@ -235,17 +269,52 @@ function renderSettings() {
   dom.syncWindow.value = String(state.settings.sync_window_hours || 24);
   dom.preferredLocation.value = state.settings.preferred_location || "";
   dom.userNotes.value = state.settings.user_notes || "";
+  dom.toneSetting.value = state.settings.tone || "concise";
+}
+
+function renderDocuments() {
+  dom.documentsList.innerHTML = state.documents.length
+    ? state.documents.map(doc => `
+      <div class="document-card">
+        <strong>${safeText(doc.name)}</strong>
+        <p>${safeText(doc.doc_type)}</p>
+        <p>${safeText(doc.content_text.slice(0, 220), "No content")}...</p>
+      </div>
+    `).join("")
+    : emptyState("Generated resumes and cover letters will appear here.");
+}
+
+function renderTasks() {
+  dom.tasksList.innerHTML = state.tasks.length
+    ? state.tasks.map(task => `
+      <div class="task-card" data-task-id="${task.id}">
+        <div class="section-head compact">
+          <div>
+            <strong>${safeText(task.title)}</strong>
+            <p>${safeText(task.details, "No details")}</p>
+          </div>
+          <select class="field task-status-select" data-action="task-status">
+            ${TASK_STATUSES.map(status => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status.replace("_", " ")}</option>`).join("")}
+          </select>
+        </div>
+        <div class="chip-row">
+          <span class="chip">${safeText(task.task_type)}</span>
+          ${task.due_date ? `<span class="chip">Due ${task.due_date}</span>` : ""}
+        </div>
+      </div>
+    `).join("")
+    : emptyState("AI-generated tasks will appear here.");
 }
 
 function renderChatHistory() {
   dom.chatMessages.innerHTML = state.chatHistory.length
     ? state.chatHistory.map(item => `
-        <div class="chat-bubble ${item.role === "assistant" ? "assistant" : "user"}">
-          <span>${item.role}</span>
-          <p>${item.message}</p>
-        </div>
-      `).join("")
-    : `<div class="panel empty-state">Ask the assistant about jobs, resume data, keywords, or settings.</div>`;
+      <div class="chat-bubble ${item.role === "assistant" ? "assistant" : "user"}">
+        <span>${item.role}</span>
+        <p>${item.message}</p>
+      </div>
+    `).join("")
+    : emptyState("Ask the assistant about jobs, resume data, parsed roles, tasks, or settings.");
   dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
 }
 
@@ -253,9 +322,29 @@ function populateEmailJobDropdown() {
   dom.emailJobLink.innerHTML = `<option value="">Optionally link to a job</option>${state.jobs.map(job => `<option value="${job.id}">${job.company} — ${job.role}</option>`).join("")}`;
 }
 
-function setUploadStatus(input, target) {
-  const file = input.files?.[0];
-  target.textContent = file ? `Selected: ${file.name}` : "No file selected.";
+function renderParseResults() {
+  const intake = state.currentIntake;
+  if (!intake) {
+    dom.parseJobResults.classList.add("hidden");
+    return;
+  }
+  const parsed = intake.parsed_job || {};
+  const match = intake.match_analysis || {};
+  dom.parseJobResults.classList.remove("hidden");
+  dom.parsedCompany.textContent = safeText(parsed.company);
+  dom.parsedRole.textContent = safeText(parsed.role);
+  dom.parsedLocation.textContent = safeText(parsed.location);
+  dom.parsedMatchScore.textContent = match.score ? `${match.score}%` : "—";
+  dom.parsedSkills.innerHTML = renderChips(parsed.skills || []);
+  dom.parsedSummary.textContent = safeText(parsed.summary);
+  dom.parsedMatchSummary.textContent = safeText(match.summary, "No match summary yet.");
+  dom.jobActions.innerHTML = (intake.suggested_actions || []).map(action => `
+    <button class="action-card" type="button" data-action-id="${action.id}">
+      <strong>${action.label}</strong>
+      <p class="muted">${action.description}</p>
+    </button>
+  `).join("");
+  dom.generatedOutput.textContent = "Select an action to create AI output.";
 }
 
 async function loadDashboard() {
@@ -275,9 +364,10 @@ async function loadProfile() {
   dom.resumeBox.value = profile.resume_text || "";
   state.parsedProfile = profile.parsed_profile || {};
   state.chatHistory = profile.chat_history || [];
+  state.documents = profile.documents || [];
   renderProfile();
   renderChatHistory();
-
+  renderDocuments();
   const keywords = await api("/api/keywords");
   dom.keywordBox.value = (keywords.keywords || []).join("\n");
 }
@@ -289,8 +379,18 @@ async function loadSettings() {
   renderSettings();
 }
 
+async function loadTasks() {
+  state.tasks = await api("/api/tasks");
+  renderTasks();
+}
+
+async function loadDocuments() {
+  state.documents = await api("/api/documents");
+  renderDocuments();
+}
+
 async function loadAllData() {
-  await Promise.all([loadDashboard(), loadJobs(), loadProfile(), loadSettings()]);
+  await Promise.all([loadDashboard(), loadJobs(), loadProfile(), loadSettings(), loadTasks(), loadDocuments()]);
 }
 
 async function checkAuth() {
@@ -325,7 +425,7 @@ async function handleLogout() {
   try {
     await api("/api/auth/logout", { method: "POST" });
   } catch {
-    // ignore logout failure
+    // ignore
   }
   dom.loginForm.reset();
   showLogin();
@@ -337,6 +437,8 @@ async function handleAddJob(event) {
   const formData = new FormData(dom.addJobForm);
   const payload = Object.fromEntries(formData.entries());
   payload.date = payload.date || new Date().toISOString().slice(0, 10);
+  payload.skills = [];
+  payload.metadata_json = {};
   try {
     await api("/api/jobs", { method: "POST", body: JSON.stringify(payload) });
     dom.addJobForm.reset();
@@ -351,12 +453,10 @@ async function handleAddJob(event) {
 async function handleJobListClick(event) {
   const row = event.target.closest("[data-job-id]");
   if (!row) return;
-  const jobId = row.dataset.jobId;
-
   if (event.target.dataset.action === "delete") {
     try {
-      await api(`/api/jobs/${jobId}`, { method: "DELETE" });
-      await Promise.all([loadDashboard(), loadJobs()]);
+      await api(`/api/jobs/${row.dataset.jobId}`, { method: "DELETE" });
+      await Promise.all([loadDashboard(), loadJobs(), loadTasks()]);
       showToast("Job deleted");
     } catch (error) {
       showToast(error.message);
@@ -379,6 +479,21 @@ async function handleJobListChange(event) {
   }
 }
 
+async function handleTaskListChange(event) {
+  const card = event.target.closest("[data-task-id]");
+  if (!card || event.target.dataset.action !== "task-status") return;
+  try {
+    await api(`/api/tasks/${card.dataset.taskId}`, {
+      method: "PUT",
+      body: JSON.stringify({ status: event.target.value })
+    });
+    await Promise.all([loadTasks(), loadDashboard()]);
+    showToast("Task updated");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 async function handleResumeAnalyze() {
   try {
     const data = await api("/api/resume/analyze", {
@@ -395,10 +510,12 @@ async function handleResumeAnalyze() {
 
 async function handleResumeSave() {
   try {
-    await api("/api/resume/save", {
+    const data = await api("/api/resume/save", {
       method: "POST",
       body: JSON.stringify({ resume_text: dom.resumeBox.value, parsed_profile: state.parsedProfile })
     });
+    state.parsedProfile = data.parsed_profile || state.parsedProfile;
+    await Promise.all([loadProfile(), loadDocuments()]);
     showToast("Profile saved");
   } catch (error) {
     showToast(error.message);
@@ -424,7 +541,8 @@ async function handleSettingsSave() {
       body: JSON.stringify({
         sync_window_hours: Number(dom.syncWindow.value || 24),
         preferred_location: dom.preferredLocation.value,
-        user_notes: dom.userNotes.value
+        user_notes: dom.userNotes.value,
+        tone: dom.toneSetting.value
       })
     });
     state.settings = data.settings || {};
@@ -466,39 +584,96 @@ async function handleChat(event) {
   }
 }
 
+function openParseModal() {
+  dom.parseJobModal.classList.remove("hidden");
+  dom.jobUrlInput.focus();
+}
+
+function closeParseModal() {
+  dom.parseJobModal.classList.add("hidden");
+}
+
+async function handleParseJob() {
+  if (!dom.jobUrlInput.value.trim()) {
+    showToast("Enter a job URL first");
+    return;
+  }
+  dom.parseLoading.classList.remove("hidden");
+  dom.parseJobBtn.disabled = true;
+  try {
+    const data = await api("/api/jobs/parse-link", {
+      method: "POST",
+      body: JSON.stringify({ url: dom.jobUrlInput.value.trim() })
+    });
+    state.currentIntake = data;
+    renderParseResults();
+    showToast("Job parsed");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    dom.parseLoading.classList.add("hidden");
+    dom.parseJobBtn.disabled = false;
+  }
+}
+
+async function handleParsedActionClick(event) {
+  const button = event.target.closest("[data-action-id]");
+  if (!button || !state.currentIntake) return;
+  const action = button.dataset.actionId;
+  dom.generatedOutput.textContent = "Generating output...";
+  try {
+    const data = await api("/api/jobs/action", {
+      method: "POST",
+      body: JSON.stringify({ intake_id: state.currentIntake.intake_id, action })
+    });
+    if (data.document?.content_text) {
+      dom.generatedOutput.textContent = data.document.content_text;
+    } else if (data.match_analysis) {
+      dom.generatedOutput.textContent = JSON.stringify(data.match_analysis, null, 2);
+    } else if (data.job) {
+      dom.generatedOutput.textContent = `Saved ${data.job.company} — ${data.job.role} as ${data.job.status}.`;
+    } else {
+      dom.generatedOutput.textContent = "Action saved.";
+    }
+    await Promise.all([loadDashboard(), loadJobs(), loadTasks(), loadDocuments()]);
+    showToast("Action completed");
+  } catch (error) {
+    dom.generatedOutput.textContent = error.message;
+    showToast(error.message);
+  }
+}
+
 function attachEvents() {
   dom.loginForm.addEventListener("submit", handleLogin);
   dom.logoutBtn.addEventListener("click", handleLogout);
   dom.navButtons.forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
-  dom.refreshDashboardBtn.addEventListener("click", loadDashboard);
-  dom.jobsRefreshBtn.addEventListener("click", loadJobs);
+  dom.refreshDashboardBtn.addEventListener("click", () => Promise.all([loadDashboard(), loadTasks()]));
+  dom.jobsRefreshBtn.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
   dom.openAddJobBtn.addEventListener("click", () => dom.addJobModal.classList.remove("hidden"));
   dom.closeAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
   dom.cancelAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
   dom.addJobForm.addEventListener("submit", handleAddJob);
+  dom.openParseJobBtns.forEach(button => button && button.addEventListener("click", openParseModal));
+  dom.closeParseJobModal.addEventListener("click", closeParseModal);
+  dom.parseJobBtn.addEventListener("click", handleParseJob);
+  dom.jobActions.addEventListener("click", handleParsedActionClick);
   dom.jobsSearchInput.addEventListener("input", renderJobsList);
   dom.jobsStatusFilter.addEventListener("change", renderJobsList);
   dom.jobsList.addEventListener("click", handleJobListClick);
   dom.jobsList.addEventListener("change", handleJobListChange);
+  dom.tasksList.addEventListener("change", handleTaskListChange);
   dom.analyzeResumeBtn.addEventListener("click", handleResumeAnalyze);
   dom.saveResumeBtn.addEventListener("click", handleResumeSave);
   dom.saveKeywordsBtn.addEventListener("click", handleKeywordsSave);
   dom.saveSettingsBtn.addEventListener("click", handleSettingsSave);
   dom.parseEmailBtn.addEventListener("click", handleEmailParse);
   dom.chatForm.addEventListener("submit", handleChat);
-  dom.resumeUploadBtn.addEventListener("click", () => dom.resumeUpload.click());
-  dom.coverLetterUploadBtn.addEventListener("click", () => dom.coverLetterUpload.click());
-  dom.resumeUpload.addEventListener("change", () => setUploadStatus(dom.resumeUpload, dom.resumeUploadStatus));
-  dom.coverLetterUpload.addEventListener("change", () => setUploadStatus(dom.coverLetterUpload, dom.coverLetterUploadStatus));
-  dom.addJobModal.addEventListener("click", event => {
-    if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden");
-  });
+  dom.addJobModal.addEventListener("click", event => { if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden"); });
+  dom.parseJobModal.addEventListener("click", event => { if (event.target === dom.parseJobModal) closeParseModal(); });
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
   attachEvents();
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+  if (window.lucide) window.lucide.createIcons();
   await checkAuth();
 });
