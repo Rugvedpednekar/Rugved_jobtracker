@@ -26,7 +26,7 @@ INDEX_FILE = BASE_DIR / "index.html"
 SCRIPT_FILE = BASE_DIR / "script.js"
 STYLE_FILE = BASE_DIR / "style.css"
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+RAW_DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
 DASHBOARD_EMAIL = os.getenv("DASHBOARD_EMAIL", "").strip().lower()
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
@@ -37,6 +37,16 @@ APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 REQUIRE_NOVA = os.getenv("REQUIRE_NOVA", "false").strip().lower() == "true"
 PORT = int(os.getenv("PORT", "8000"))
 
+def normalize_database_url(database_url: str) -> str:
+    url = (database_url or "").strip()
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
+DATABASE_URL = normalize_database_url(RAW_DATABASE_URL)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 COOKIE_NAME = "jobtracker_token"
@@ -233,7 +243,7 @@ def utc_now() -> str:
 
 def require_env() -> None:
     missing = []
-    if not DATABASE_URL:
+    if not RAW_DATABASE_URL:
         missing.append("DATABASE_URL")
     if not JWT_SECRET:
         missing.append("JWT_SECRET")
@@ -384,7 +394,10 @@ def get_db() -> Generator[Session, None, None]:
 
 def verify_password(plain_password: str) -> bool:
     if DASHBOARD_PASSWORD_HASH:
-        return pwd_context.verify(plain_password, DASHBOARD_PASSWORD_HASH)
+        try:
+            return pwd_context.verify(plain_password, DASHBOARD_PASSWORD_HASH)
+        except (ValueError, TypeError):
+            return False
     return plain_password == DASHBOARD_PASSWORD
 
 
