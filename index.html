@@ -18,160 +18,165 @@
   <link rel="stylesheet" href="/style.css" />
 
   <style>
-    body {
-      font-family: "Inter", sans-serif;
-      background: #f8fafc;
-      color: #0f172a;
-    }
+  body {
+    font-family: "Inter", sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+  }
 
-    .section-panel {
+  .section-panel {
+    display: none;
+  }
+
+  .section-panel.active {
+    display: block;
+  }
+
+  .nav-btn.active {
+    background: #1e3a8a;
+    color: white;
+  }
+
+  .board-scroll {
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(260px, 1fr));
+    gap: 1rem;
+    min-width: 1320px;
+  }
+
+  .job-card {
+    border: 1px solid #334155;
+    border-left: 4px solid #3b82f6;
+    background: #1e293b;
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  .stat-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  .soft-card {
+    background: #111827;
+    border: 1px solid #334155;
+    border-radius: 24px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  .field {
+    width: 100%;
+    border: 1px solid #475569;
+    border-radius: 14px;
+    padding: 12px 14px;
+    outline: none;
+    background: #0f172a;
+    color: #e2e8f0;
+  }
+
+  .field::placeholder {
+    color: #94a3b8;
+  }
+
+  .field:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  }
+
+  .btn-primary {
+    background: #2563eb;
+    color: white;
+    border-radius: 14px;
+    padding: 11px 16px;
+    font-weight: 700;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  .btn-dark {
+    background: #020617;
+    color: white;
+    border-radius: 14px;
+    padding: 11px 16px;
+    font-weight: 700;
+  }
+
+  .btn-dark:hover {
+    background: #000000;
+  }
+
+  .btn-soft {
+    background: #1e293b;
+    color: #bfdbfe;
+    border: 1px solid #3b82f6;
+    border-radius: 14px;
+    padding: 11px 16px;
+    font-weight: 700;
+  }
+
+  .btn-soft:hover {
+    background: #334155;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .chip-blue {
+    background: #1e3a8a;
+    color: #dbeafe;
+  }
+
+  .chip-green {
+    background: #14532d;
+    color: #dcfce7;
+  }
+
+  .chip-yellow {
+    background: #78350f;
+    color: #fef3c7;
+  }
+
+  .chip-red {
+    background: #7f1d1d;
+    color: #fee2e2;
+  }
+
+  .login-bg {
+    background:
+      radial-gradient(circle at top left, rgba(37, 99, 235, 0.24), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.18), transparent 30%),
+      #020617;
+  }
+
+  @media (max-width: 1024px) {
+    .desktop-nav {
       display: none;
     }
+  }
 
-    .section-panel.active {
-      display: block;
+  @media (min-width: 1025px) {
+    .mobile-nav {
+      display: none;
     }
-
-    .nav-btn.active {
-      background: #1d4ed8;
-      color: white;
-    }
-
-    .board-scroll {
-      overflow-x: auto;
-      padding-bottom: 0.5rem;
-    }
-
-    .board-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(260px, 1fr));
-      gap: 1rem;
-      min-width: 1320px;
-    }
-
-    .job-card {
-      border: 1px solid #dbeafe;
-      border-left: 4px solid #2563eb;
-      background: white;
-      border-radius: 16px;
-      padding: 14px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-    }
-
-    .stat-card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 20px;
-      padding: 18px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-    }
-
-    .soft-card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 24px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-    }
-
-    .field {
-      width: 100%;
-      border: 1px solid #cbd5e1;
-      border-radius: 14px;
-      padding: 12px 14px;
-      outline: none;
-      background: white;
-    }
-
-    .field:focus {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-    }
-
-    .btn-primary {
-      background: #2563eb;
-      color: white;
-      border-radius: 14px;
-      padding: 11px 16px;
-      font-weight: 700;
-    }
-
-    .btn-primary:hover {
-      background: #1d4ed8;
-    }
-
-    .btn-dark {
-      background: #0f172a;
-      color: white;
-      border-radius: 14px;
-      padding: 11px 16px;
-      font-weight: 700;
-    }
-
-    .btn-dark:hover {
-      background: #020617;
-    }
-
-    .btn-soft {
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1px solid #bfdbfe;
-      border-radius: 14px;
-      padding: 11px 16px;
-      font-weight: 700;
-    }
-
-    .btn-soft:hover {
-      background: #dbeafe;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 9999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .chip-blue {
-      background: #dbeafe;
-      color: #1d4ed8;
-    }
-
-    .chip-green {
-      background: #dcfce7;
-      color: #166534;
-    }
-
-    .chip-yellow {
-      background: #fef3c7;
-      color: #92400e;
-    }
-
-    .chip-red {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
-
-    .login-bg {
-      background:
-        radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 30%),
-        radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.16), transparent 30%),
-        #f8fafc;
-    }
-
-    @media (max-width: 1024px) {
-      .desktop-nav {
-        display: none;
-      }
-    }
-
-    @media (min-width: 1025px) {
-      .mobile-nav {
-        display: none;
-      }
-    }
-  </style>
+  }
+ </style>
 </head>
 <body>
   <!-- LOGIN PAGE -->
@@ -542,46 +547,48 @@ OPT Sponsorship"
       <!-- DOCS -->
       <section id="docs" class="section-panel space-y-6">
         <div>
-          <h2 class="text-3xl font-extrabold tracking-tight">Documents</h2>
-          <p class="text-slate-500">Cover letters, resume generation, and saved material.</p>
+            <h2 class="text-3xl font-extrabold tracking-tight">Documents</h2>
+            <p class="text-slate-400">Cover letters, resume versions, and saved files.</p>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div class="soft-card p-6">
+            <div class="soft-card p-6">
             <div class="flex items-center justify-between gap-4">
-              <div>
+                <div>
                 <h3 class="text-2xl font-extrabold">Cover Letters</h3>
-                <p class="text-sm text-slate-500 mt-2">Generate or upload cover letters.</p>
-              </div>
-              <div class="flex gap-2">
-                <button class="btn-soft">Upload</button>
+                <p class="text-sm text-slate-400 mt-2">Upload or generate cover letters.</p>
+                </div>
+                <div class="flex gap-2">
+                <input id="cover-letter-upload" type="file" class="hidden" />
+                <button id="cover-letter-upload-btn" class="btn-soft">Upload</button>
                 <button class="btn-primary">Generate</button>
-              </div>
+                </div>
             </div>
 
-            <div class="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-6 text-slate-500 text-sm">
-              Document management section ready for backend integration.
+            <div id="cover-letter-upload-status" class="mt-6 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-sm text-slate-300">
+                No file uploaded yet.
             </div>
-          </div>
+            </div>
 
-          <div class="soft-card p-6">
+            <div class="soft-card p-6">
             <div class="flex items-center justify-between gap-4">
-              <div>
+                <div>
                 <h3 class="text-2xl font-extrabold">CV / Resume</h3>
-                <p class="text-sm text-slate-500 mt-2">Store and generate resume versions.</p>
-              </div>
-              <div class="flex gap-2">
-                <button class="btn-soft">Upload</button>
+                <p class="text-sm text-slate-400 mt-2">Upload and manage resume versions.</p>
+                </div>
+                <div class="flex gap-2">
+                <input id="resume-upload" type="file" class="hidden" />
+                <button id="resume-upload-btn" class="btn-soft">Upload</button>
                 <button class="btn-primary">Generate</button>
-              </div>
+                </div>
             </div>
 
-            <div class="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-6 text-slate-500 text-sm">
-              Resume document area ready for future enhancement.
+            <div id="resume-upload-status" class="mt-6 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-sm text-slate-300">
+                No file uploaded yet.
             </div>
-          </div>
+            </div>
         </div>
-      </section>
+        </section>
 
       <!-- SETTINGS -->
       <section id="settings" class="section-panel space-y-6">
@@ -733,6 +740,83 @@ OPT Sponsorship"
   <div id="toast" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[60] rounded-full bg-slate-900 text-white px-5 py-3 text-sm font-semibold shadow-xl">
     Saved
   </div>
+
+  <script>
+    const loginScreen = document.getElementById("login-screen");
+    const appShell = document.getElementById("app-shell");
+    const sectionPanels = document.querySelectorAll(".section-panel");
+    const navButtons = document.querySelectorAll(".nav-btn");
+    const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+    const mobileMenu = document.getElementById("mobile-menu");
+
+    function activateSection(sectionId) {
+      sectionPanels.forEach((panel) => panel.classList.remove("active"));
+      document.getElementById(sectionId)?.classList.add("active");
+
+      navButtons.forEach((btn) => {
+        const active = btn.dataset.section === sectionId;
+        btn.classList.toggle("active", active);
+        if (active) {
+          btn.classList.add("bg-blue-800");
+        } else {
+          btn.classList.remove("bg-blue-800");
+        }
+      });
+
+      if (mobileMenu) {
+        mobileMenu.classList.add("hidden");
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    navButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.section;
+        if (target) activateSection(target);
+      });
+    });
+
+    mobileMenuBtn?.addEventListener("click", () => {
+      mobileMenu.classList.toggle("hidden");
+    });
+
+    function openApp() {
+      loginScreen.classList.add("hidden");
+      appShell.classList.remove("hidden");
+    }
+
+    function showLogin() {
+      appShell.classList.add("hidden");
+      loginScreen.classList.remove("hidden");
+    }
+
+    const addJobModal = document.getElementById("add-job-modal");
+    const openAddButtons = [
+      document.getElementById("open-add-job"),
+      document.getElementById("jobs-add-btn")
+    ];
+
+    openAddButtons.forEach((btn) => {
+      btn?.addEventListener("click", () => {
+        addJobModal.classList.remove("hidden");
+      });
+    });
+
+    document.getElementById("close-add-job-modal")?.addEventListener("click", () => {
+      addJobModal.classList.add("hidden");
+    });
+
+    document.getElementById("cancel-add-job-modal")?.addEventListener("click", () => {
+      addJobModal.classList.add("hidden");
+    });
+
+    lucide.createIcons();
+
+    // Let script.js decide actual auth state later.
+    // Temporary default:
+    // showLogin();
+  </script>
 
   <script src="/script.js"></script>
 </body>
