@@ -1,166 +1,111 @@
-// ================================
-// JobTracker Frontend Script
-// ================================
-
 const API_BASE = "";
-let allJobs = [];
-let parsedProfile = {};
-let appSettings = {};
-let dashboardData = null;
+const STATUS_ORDER = ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Rejected", "Archived"];
 
-// --------------------
-// DOM
-// --------------------
-const loginScreen = document.getElementById("login-screen");
-const appShell = document.getElementById("app-shell");
-const loginForm = document.getElementById("login-form");
-const loginEmail = document.getElementById("login-email");
-const loginPassword = document.getElementById("login-password");
-const loginError = document.getElementById("login-error");
+const state = {
+  jobs: [],
+  parsedProfile: {},
+  settings: {},
+  dashboard: null,
+  chatHistory: []
+};
 
-const toast = document.getElementById("toast");
+const dom = {
+  loginScreen: document.getElementById("login-screen"),
+  appShell: document.getElementById("app-shell"),
+  loginForm: document.getElementById("login-form"),
+  loginEmail: document.getElementById("login-email"),
+  loginPassword: document.getElementById("login-password"),
+  loginError: document.getElementById("login-error"),
+  toast: document.getElementById("toast"),
+  navButtons: document.querySelectorAll(".nav-btn"),
+  panels: document.querySelectorAll(".section-panel"),
+  logoutBtn: document.getElementById("logout-btn"),
+  refreshDashboardBtn: document.getElementById("refresh-dashboard-btn"),
+  jobsRefreshBtn: document.getElementById("jobs-refresh-btn"),
+  openAddJobBtn: document.getElementById("open-add-job"),
+  addJobModal: document.getElementById("add-job-modal"),
+  addJobForm: document.getElementById("add-job-form"),
+  closeAddJobModal: document.getElementById("close-add-job-modal"),
+  cancelAddJobModal: document.getElementById("cancel-add-job-modal"),
+  jobsSearchInput: document.getElementById("jobs-search-input"),
+  jobsStatusFilter: document.getElementById("jobs-status-filter"),
+  jobsList: document.getElementById("jobs-list"),
+  totalCount: document.getElementById("total-count"),
+  wishlistCount: document.getElementById("wishlist-count"),
+  appliedCount: document.getElementById("applied-count"),
+  interviewCount: document.getElementById("interview-count"),
+  offeredCount: document.getElementById("offered-count"),
+  acceptedCount: document.getElementById("accepted-count"),
+  wishlistBadge: document.getElementById("wishlist-badge"),
+  appliedBadge: document.getElementById("applied-badge"),
+  interviewBadge: document.getElementById("interview-badge"),
+  offeredBadge: document.getElementById("offered-badge"),
+  acceptedBadge: document.getElementById("accepted-badge"),
+  wishlistColumn: document.getElementById("wishlist-column"),
+  appliedColumn: document.getElementById("applied-column"),
+  interviewColumn: document.getElementById("interview-column"),
+  offeredColumn: document.getElementById("offered-column"),
+  acceptedColumn: document.getElementById("accepted-column"),
+  resumeBox: document.getElementById("resume-box"),
+  parsedProfileOutput: document.getElementById("parsed-profile-output"),
+  analyzeResumeBtn: document.getElementById("analyze-resume-btn"),
+  saveResumeBtn: document.getElementById("save-resume-btn"),
+  keywordBox: document.getElementById("keyword-box"),
+  saveKeywordsBtn: document.getElementById("save-keywords-btn"),
+  syncWindow: document.getElementById("sync-window"),
+  preferredLocation: document.getElementById("preferred-location"),
+  userNotes: document.getElementById("user-notes"),
+  saveSettingsBtn: document.getElementById("save-settings-btn"),
+  gmailSyncStatus: document.getElementById("gmail-sync-status"),
+  resumeUpload: document.getElementById("resume-upload"),
+  resumeUploadBtn: document.getElementById("resume-upload-btn"),
+  resumeUploadStatus: document.getElementById("resume-upload-status"),
+  coverLetterUpload: document.getElementById("cover-letter-upload"),
+  coverLetterUploadBtn: document.getElementById("cover-letter-upload-btn"),
+  coverLetterUploadStatus: document.getElementById("cover-letter-upload-status"),
+  emailParserInput: document.getElementById("email-parser-input"),
+  emailJobLink: document.getElementById("email-job-link"),
+  parsedEmailStatus: document.getElementById("parsed-email-status"),
+  parsedEmailReason: document.getElementById("parsed-email-reason"),
+  parseEmailBtn: document.getElementById("parse-email-btn"),
+  chatMessages: document.getElementById("chat-messages"),
+  chatForm: document.getElementById("chat-form"),
+  chatInput: document.getElementById("chat-input")
+};
 
-const navButtons = document.querySelectorAll(".nav-btn");
-const sectionPanels = document.querySelectorAll(".section-panel");
-
-const mobileMenuBtn = document.getElementById("mobile-menu-btn");
-const mobileMenu = document.getElementById("mobile-menu");
-
-const logoutBtn = document.getElementById("logout-btn");
-const mobileLogoutBtn = document.getElementById("mobile-logout-btn");
-
-const addJobModal = document.getElementById("add-job-modal");
-const addJobForm = document.getElementById("add-job-form");
-
-const openAddJobBtn = document.getElementById("open-add-job");
-const jobsAddBtn = document.getElementById("jobs-add-btn");
-const closeAddJobModal = document.getElementById("close-add-job-modal");
-const cancelAddJobModal = document.getElementById("cancel-add-job-modal");
-
-const refreshDashboardBtn = document.getElementById("refresh-dashboard-btn");
-const jobsRefreshBtn = document.getElementById("jobs-refresh-btn");
-
-const analyzeResumeBtn = document.getElementById("analyze-resume-btn");
-const analyzeResumeTopBtn = document.getElementById("analyze-resume-top-btn");
-const saveResumeBtn = document.getElementById("save-resume-btn");
-const saveKeywordsBtn = document.getElementById("save-keywords-btn");
-const saveSettingsBtn = document.getElementById("save-settings-btn");
-const parseEmailBtn = document.getElementById("parse-email-btn");
-
-const chatForm = document.getElementById("chat-form");
-const chatInput = document.getElementById("chat-input");
-const chatMessages = document.getElementById("chat-messages");
-
-const jobsSearchInput = document.getElementById("jobs-search-input");
-const jobsStatusFilter = document.getElementById("jobs-status-filter");
-const jobsCompanyFilter = document.getElementById("jobs-company-filter");
-
-const resumeBox = document.getElementById("resume-box");
-const parsedProfileOutput = document.getElementById("parsed-profile-output");
-const keywordBox = document.getElementById("keyword-box");
-
-const syncWindow = document.getElementById("sync-window");
-const preferredLocation = document.getElementById("preferred-location");
-const userNotes = document.getElementById("user-notes");
-
-const emailParserInput = document.getElementById("email-parser-input");
-const emailJobLink = document.getElementById("email-job-link");
-const parsedEmailStatus = document.getElementById("parsed-email-status");
-const parsedEmailReason = document.getElementById("parsed-email-reason");
-
-// Tracker stats
-const wishlistCount = document.getElementById("wishlist-count");
-const appliedCount = document.getElementById("applied-count");
-const interviewCount = document.getElementById("interview-count");
-const offeredCount = document.getElementById("offered-count");
-const acceptedCount = document.getElementById("accepted-count");
-
-const wishlistBadge = document.getElementById("wishlist-badge");
-const appliedBadge = document.getElementById("applied-badge");
-const interviewBadge = document.getElementById("interview-badge");
-const offeredBadge = document.getElementById("offered-badge");
-const acceptedBadge = document.getElementById("accepted-badge");
-
-const wishlistColumn = document.getElementById("wishlist-column");
-const appliedColumn = document.getElementById("applied-column");
-const interviewColumn = document.getElementById("interview-column");
-const offeredColumn = document.getElementById("offered-column");
-const acceptedColumn = document.getElementById("accepted-column");
-
-const recentJobsList = document.getElementById("recent-jobs-list");
-const jobsList = document.getElementById("jobs-list");
-
-const coverLetterUpload = document.getElementById("cover-letter-upload");
-const coverLetterUploadBtn = document.getElementById("cover-letter-upload-btn");
-const coverLetterUploadStatus = document.getElementById("cover-letter-upload-status");
-
-const resumeUpload = document.getElementById("resume-upload");
-const resumeUploadBtn = document.getElementById("resume-upload-btn");
-const resumeUploadStatus = document.getElementById("resume-upload-status");
-
-
-coverLetterUploadBtn?.addEventListener("click", () => {
-  coverLetterUpload?.click();
-});
-
-resumeUploadBtn?.addEventListener("click", () => {
-  resumeUpload?.click();
-});
-
-coverLetterUpload?.addEventListener("change", () => {
-  const file = coverLetterUpload.files?.[0];
-  coverLetterUploadStatus.textContent = file
-    ? `Selected file: ${file.name}`
-    : "No file uploaded yet.";
-});
-
-resumeUpload?.addEventListener("change", () => {
-  const file = resumeUpload.files?.[0];
-  resumeUploadStatus.textContent = file
-    ? `Selected file: ${file.name}`
-    : "No file uploaded yet.";
-});
-
-// --------------------
-// Helpers
-// --------------------
 function showToast(message) {
-  if (!toast) return;
-  toast.textContent = message;
-  toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 2500);
+  if (!dom.toast) return;
+  dom.toast.textContent = message;
+  dom.toast.classList.remove("hidden");
+  setTimeout(() => dom.toast.classList.add("hidden"), 2400);
 }
 
 function showLogin() {
-  loginScreen.classList.remove("hidden");
-  appShell.classList.add("hidden");
+  dom.loginScreen.classList.remove("hidden");
+  dom.appShell.classList.add("hidden");
 }
 
 function showApp() {
-  loginScreen.classList.add("hidden");
-  appShell.classList.remove("hidden");
+  dom.loginScreen.classList.add("hidden");
+  dom.appShell.classList.remove("hidden");
 }
 
-function activateSection(sectionId) {
-  sectionPanels.forEach(panel => panel.classList.remove("active"));
-  document.getElementById(sectionId)?.classList.add("active");
-
-  navButtons.forEach(btn => {
-    const active = btn.dataset.section === sectionId;
-    btn.classList.toggle("active", active);
-    btn.classList.toggle("bg-blue-800", active);
-  });
-
-  mobileMenu?.classList.add("hidden");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+function setSection(sectionId) {
+  dom.panels.forEach(panel => panel.classList.toggle("hidden", panel.id !== sectionId));
+  dom.panels.forEach(panel => panel.classList.toggle("active", panel.id === sectionId));
+  dom.navButtons.forEach(button => button.classList.toggle("active", button.dataset.section === sectionId));
 }
 
-function safeJSON(res) {
-  return res.json().catch(() => ({}));
+async function safeJSON(response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
 }
 
 async function api(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -168,509 +113,392 @@ async function api(path, options = {}) {
     },
     ...options
   });
-
-  const data = await safeJSON(res);
-
-  if (!res.ok) {
-    const msg = data?.detail || data?.message || "Request failed";
-    throw new Error(msg);
+  const data = await safeJSON(response);
+  if (!response.ok) {
+    throw new Error(data.detail || data.message || "Request failed");
   }
-
   return data;
 }
 
-function formatStatusChip(status) {
-  const map = {
-    Wishlist: "chip chip-blue",
-    Applied: "chip chip-blue",
-    Interview: "chip chip-yellow",
-    Offered: "chip chip-green",
-    Accepted: "chip chip-green",
-    Rejected: "chip chip-red"
-  };
-  return map[status] || "chip chip-blue";
+function formatDate(dateText) {
+  if (!dateText) return "—";
+  return dateText;
 }
 
-function emptyState(text) {
+function emptyState(message) {
+  return `<div class="panel empty-state">${message}</div>`;
+}
+
+function normalizeKeywordLines(text) {
+  return text
+    .split(/\n|,/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function renderTrackerCard(job) {
   return `
-    <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500 text-center">
-      ${text}
-    </div>
+    <article class="job-card-mini">
+      <div>
+        <h4>${job.company || "Unknown company"}</h4>
+        <p>${job.role || "Unknown role"}</p>
+      </div>
+      <span class="status-pill">${job.status || "Applied"}</span>
+      <small>${formatDate(job.date)}</small>
+    </article>
   `;
 }
 
-// --------------------
-// Auth
-// --------------------
+function renderDashboard() {
+  const data = state.dashboard || { stats: {}, columns: {} };
+  const stats = data.stats || {};
+  dom.totalCount.textContent = stats.total_jobs || 0;
+  dom.wishlistCount.textContent = stats.wishlist_count || 0;
+  dom.appliedCount.textContent = stats.applied_count || 0;
+  dom.interviewCount.textContent = stats.interview_count || 0;
+  dom.offeredCount.textContent = stats.offered_count || 0;
+  dom.acceptedCount.textContent = stats.accepted_count || 0;
+  dom.wishlistBadge.textContent = stats.wishlist_count || 0;
+  dom.appliedBadge.textContent = stats.applied_count || 0;
+  dom.interviewBadge.textContent = stats.interview_count || 0;
+  dom.offeredBadge.textContent = stats.offered_count || 0;
+  dom.acceptedBadge.textContent = stats.accepted_count || 0;
+
+  const columns = {
+    Wishlist: dom.wishlistColumn,
+    Applied: dom.appliedColumn,
+    Interview: dom.interviewColumn,
+    Offered: dom.offeredColumn,
+    Accepted: dom.acceptedColumn
+  };
+
+  Object.entries(columns).forEach(([status, element]) => {
+    const items = data.columns?.[status] || [];
+    element.innerHTML = items.length ? items.map(renderTrackerCard).join("") : emptyState(`No ${status.toLowerCase()} jobs yet.`);
+  });
+}
+
+function filteredJobs() {
+  const query = dom.jobsSearchInput.value.trim().toLowerCase();
+  const statusFilter = dom.jobsStatusFilter.value;
+  return state.jobs.filter(job => {
+    const matchesQuery = !query || [job.company, job.role, job.notes, job.field, job.sponsor].some(value => (value || "").toLowerCase().includes(query));
+    const matchesStatus = !statusFilter || job.status === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
+}
+
+function renderJobsList() {
+  const jobs = filteredJobs();
+  if (!jobs.length) {
+    dom.jobsList.innerHTML = emptyState("No jobs match the current filters.");
+    return;
+  }
+
+  dom.jobsList.innerHTML = `
+    <div class="table-head table-row">
+      <span>Company / Role</span>
+      <span>Status</span>
+      <span>Date</span>
+      <span>Details</span>
+      <span>Actions</span>
+    </div>
+    ${jobs.map(job => `
+      <div class="table-row" data-job-id="${job.id}">
+        <div>
+          <strong>${job.company}</strong>
+          <p>${job.role}</p>
+        </div>
+        <div>
+          <select class="field job-status-select" data-action="status">
+            ${STATUS_ORDER.map(status => `<option value="${status}" ${job.status === status ? "selected" : ""}>${status}</option>`).join("")}
+          </select>
+        </div>
+        <div>${formatDate(job.date)}</div>
+        <div class="table-details">
+          <p>${job.field || "—"}</p>
+          <p>${job.salary || "—"}</p>
+        </div>
+        <div class="inline-actions">
+          <button class="btn btn-ghost" data-action="delete" type="button">Delete</button>
+        </div>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderProfile() {
+  dom.parsedProfileOutput.textContent = JSON.stringify(state.parsedProfile || {}, null, 2);
+}
+
+function renderSettings() {
+  dom.syncWindow.value = String(state.settings.sync_window_hours || 24);
+  dom.preferredLocation.value = state.settings.preferred_location || "";
+  dom.userNotes.value = state.settings.user_notes || "";
+}
+
+function renderChatHistory() {
+  dom.chatMessages.innerHTML = state.chatHistory.length
+    ? state.chatHistory.map(item => `
+        <div class="chat-bubble ${item.role === "assistant" ? "assistant" : "user"}">
+          <span>${item.role}</span>
+          <p>${item.message}</p>
+        </div>
+      `).join("")
+    : `<div class="panel empty-state">Ask the assistant about jobs, resume data, keywords, or settings.</div>`;
+  dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+}
+
+function populateEmailJobDropdown() {
+  dom.emailJobLink.innerHTML = `<option value="">Optionally link to a job</option>${state.jobs.map(job => `<option value="${job.id}">${job.company} — ${job.role}</option>`).join("")}`;
+}
+
+function setUploadStatus(input, target) {
+  const file = input.files?.[0];
+  target.textContent = file ? `Selected: ${file.name}` : "No file selected.";
+}
+
+async function loadDashboard() {
+  state.dashboard = await api("/api/dashboard/simple");
+  dom.gmailSyncStatus.textContent = state.dashboard.gmail_sync?.message || "Not configured";
+  renderDashboard();
+}
+
+async function loadJobs() {
+  state.jobs = await api("/api/jobs");
+  renderJobsList();
+  populateEmailJobDropdown();
+}
+
+async function loadProfile() {
+  const profile = await api("/api/profile");
+  dom.resumeBox.value = profile.resume_text || "";
+  state.parsedProfile = profile.parsed_profile || {};
+  state.chatHistory = profile.chat_history || [];
+  renderProfile();
+  renderChatHistory();
+
+  const keywords = await api("/api/keywords");
+  dom.keywordBox.value = (keywords.keywords || []).join("\n");
+}
+
+async function loadSettings() {
+  const data = await api("/api/settings");
+  state.settings = data.settings || {};
+  dom.gmailSyncStatus.textContent = data.gmail_sync?.message || "Not configured";
+  renderSettings();
+}
+
+async function loadAllData() {
+  await Promise.all([loadDashboard(), loadJobs(), loadProfile(), loadSettings()]);
+}
+
 async function checkAuth() {
   try {
     await api("/api/auth/me");
     showApp();
-    await loadInitialData();
+    await loadAllData();
   } catch {
     showLogin();
   }
 }
 
-async function handleLogin(e) {
-  e.preventDefault();
-  loginError.classList.add("hidden");
-  loginError.textContent = "";
-
+async function handleLogin(event) {
+  event.preventDefault();
+  dom.loginError.classList.add("hidden");
   try {
     await api("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({
-        email: loginEmail.value.trim(),
-        password: loginPassword.value
-      })
+      body: JSON.stringify({ email: dom.loginEmail.value.trim(), password: dom.loginPassword.value })
     });
-
-    showToast("Login successful");
     showApp();
-    await loadInitialData();
-  } catch (err) {
-    loginError.textContent = err.message || "Login failed";
-    loginError.classList.remove("hidden");
+    await loadAllData();
+    setSection("tracker");
+    showToast("Logged in");
+  } catch (error) {
+    dom.loginError.textContent = error.message;
+    dom.loginError.classList.remove("hidden");
   }
 }
 
 async function handleLogout() {
   try {
     await api("/api/auth/logout", { method: "POST" });
-  } catch {}
+  } catch {
+    // ignore logout failure
+  }
+  dom.loginForm.reset();
   showLogin();
-  loginForm.reset();
   showToast("Logged out");
 }
 
-// --------------------
-// Data loading
-// --------------------
-async function loadInitialData() {
-  await Promise.all([
-    loadDashboard(),
-    loadJobs(),
-    loadProfile(),
-    loadSettings()
-  ]);
-}
-
-async function loadDashboard() {
-  dashboardData = await api("/api/dashboard/simple");
-  renderDashboardSimple(dashboardData);
-}
-
-async function loadJobs() {
-  allJobs = await api("/api/jobs");
-  renderJobsList();
-  populateEmailJobDropdown();
-}
-
-async function loadProfile() {
-  const data = await api("/api/profile");
-  resumeBox.value = data.resume_text || "";
-  parsedProfile = data.parsed_profile || {};
-  parsedProfileOutput.textContent = JSON.stringify(parsedProfile, null, 2);
-
-  const keywordData = await api("/api/keywords");
-  keywordBox.value = (keywordData.keywords || []).join("\n");
-}
-
-async function loadSettings() {
-  const data = await api("/api/settings");
-  appSettings = data.settings || {};
-  syncWindow.value = String(appSettings.sync_window_hours || 24);
-  preferredLocation.value = appSettings.preferred_location || "";
-  userNotes.value = appSettings.user_notes || "";
-}
-
-// --------------------
-// Rendering
-// --------------------
-function createTrackerCard(job) {
-  return `
-    <div class="job-card">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="font-extrabold text-slate-900">${job.company || "Unknown Company"}</p>
-          <p class="text-sm text-slate-600 mt-1">${job.role || "Unknown Role"}</p>
-        </div>
-        <span class="${formatStatusChip(job.status)}">${job.status || "Applied"}</span>
-      </div>
-      <div class="mt-3 text-xs text-slate-500">
-        ${job.date || ""}
-      </div>
-    </div>
-  `;
-}
-
-function renderDashboardSimple(data) {
-  const stats = data?.stats || {};
-  const columns = data?.columns || {};
-
-  wishlistCount.textContent = stats.wishlist_count || 0;
-  appliedCount.textContent = stats.applied_count || 0;
-  interviewCount.textContent = stats.interview_count || 0;
-  offeredCount.textContent = stats.offered_count || 0;
-  acceptedCount.textContent = stats.accepted_count || 0;
-
-  wishlistBadge.textContent = stats.wishlist_count || 0;
-  appliedBadge.textContent = stats.applied_count || 0;
-  interviewBadge.textContent = stats.interview_count || 0;
-  offeredBadge.textContent = stats.offered_count || 0;
-  acceptedBadge.textContent = stats.accepted_count || 0;
-
-  wishlistColumn.innerHTML = (columns.Wishlist || []).length
-    ? columns.Wishlist.map(createTrackerCard).join("")
-    : emptyState("No wishlist jobs");
-
-  appliedColumn.innerHTML = (columns.Applied || []).length
-    ? columns.Applied.map(createTrackerCard).join("")
-    : emptyState("No applied jobs");
-
-  interviewColumn.innerHTML = (columns.Interview || []).length
-    ? columns.Interview.map(createTrackerCard).join("")
-    : emptyState("No interview jobs");
-
-  offeredColumn.innerHTML = (columns.Offered || []).length
-    ? columns.Offered.map(createTrackerCard).join("")
-    : emptyState("No offered jobs");
-
-  acceptedColumn.innerHTML = (columns.Accepted || []).length
-    ? columns.Accepted.map(createTrackerCard).join("")
-    : emptyState("No accepted jobs");
-
-  const recentJobs = allJobs.slice(0, 6);
-  recentJobsList.innerHTML = recentJobs.length
-    ? recentJobs.map(job => `
-        <div class="job-card">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <p class="font-extrabold">${job.company}</p>
-              <p class="text-sm text-slate-600 mt-1">${job.role}</p>
-              <p class="text-xs text-slate-500 mt-2">${job.date || ""}</p>
-            </div>
-            <span class="${formatStatusChip(job.status)}">${job.status}</span>
-          </div>
-        </div>
-      `).join("")
-    : emptyState("No jobs added yet.");
-}
-
-function renderJobsList() {
-  let filtered = [...allJobs];
-
-  const search = (jobsSearchInput?.value || "").trim().toLowerCase();
-  const status = jobsStatusFilter?.value || "all";
-  const company = (jobsCompanyFilter?.value || "").trim().toLowerCase();
-
-  if (search) {
-    filtered = filtered.filter(job =>
-      (job.company || "").toLowerCase().includes(search) ||
-      (job.role || "").toLowerCase().includes(search)
-    );
-  }
-
-  if (status !== "all") {
-    filtered = filtered.filter(job => (job.status || "") === status);
-  }
-
-  if (company) {
-    filtered = filtered.filter(job => (job.company || "").toLowerCase().includes(company));
-  }
-
-  jobsList.innerHTML = filtered.length ? filtered.map(job => `
-    <div class="job-card">
-      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div class="min-w-0">
-          <p class="text-xl font-extrabold">${job.role || "Untitled Role"}</p>
-          <p class="text-sm text-slate-700 font-semibold mt-1">${job.company || "Unknown Company"}</p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <span class="${formatStatusChip(job.status)}">${job.status || "Applied"}</span>
-            ${job.field ? `<span class="chip chip-blue">${job.field}</span>` : ""}
-            ${job.sponsor ? `<span class="chip chip-blue">${job.sponsor}</span>` : ""}
-          </div>
-          <div class="mt-3 text-sm text-slate-500 space-y-1">
-            ${job.date ? `<p>Date: ${job.date}</p>` : ""}
-            ${job.salary ? `<p>Salary: ${job.salary}</p>` : ""}
-            ${job.notes ? `<p>Notes: ${job.notes}</p>` : ""}
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-2 lg:w-56">
-          <select class="field job-status-change" data-id="${job.id}">
-            <option value="Wishlist" ${job.status === "Wishlist" ? "selected" : ""}>Wishlist</option>
-            <option value="Applied" ${job.status === "Applied" ? "selected" : ""}>Applied</option>
-            <option value="Interview" ${job.status === "Interview" ? "selected" : ""}>Interview</option>
-            <option value="Offered" ${job.status === "Offered" ? "selected" : ""}>Offered</option>
-            <option value="Accepted" ${job.status === "Accepted" ? "selected" : ""}>Accepted</option>
-            <option value="Rejected" ${job.status === "Rejected" ? "selected" : ""}>Rejected</option>
-          </select>
-          ${job.link ? `<a href="${job.link}" target="_blank" class="btn-soft text-center">Open Link</a>` : ""}
-          <button class="btn-soft job-delete-btn" data-id="${job.id}">Delete</button>
-        </div>
-      </div>
-    </div>
-  `).join("") : emptyState("No tracked jobs yet.");
-
-  document.querySelectorAll(".job-status-change").forEach(el => {
-    el.addEventListener("change", async (e) => {
-      const id = e.target.dataset.id;
-      const status = e.target.value;
-      await updateJobStatus(id, status);
-    });
-  });
-
-  document.querySelectorAll(".job-delete-btn").forEach(el => {
-    el.addEventListener("click", async (e) => {
-      const id = e.target.dataset.id;
-      await deleteJob(id);
-    });
-  });
-}
-
-function populateEmailJobDropdown() {
-  emailJobLink.innerHTML = `<option value="">Link parsed status to tracked job</option>` +
-    allJobs.map(job => `
-      <option value="${job.id}">${job.company} — ${job.role}</option>
-    `).join("");
-}
-
-// --------------------
-// Jobs
-// --------------------
-async function createJob(e) {
-  e.preventDefault();
-
-  const payload = {
-    company: document.getElementById("job-company").value.trim(),
-    role: document.getElementById("job-role").value.trim(),
-    status: document.getElementById("job-status").value,
-    date: document.getElementById("job-date").value || new Date().toISOString().split("T")[0],
-    field: document.getElementById("job-field").value.trim() || "Tech",
-    salary: document.getElementById("job-salary").value.trim(),
-    sponsor: document.getElementById("job-sponsor").value.trim() || "Unknown",
-    link: document.getElementById("job-link").value.trim(),
-    notes: document.getElementById("job-notes").value.trim()
-  };
-
+async function handleAddJob(event) {
+  event.preventDefault();
+  const formData = new FormData(dom.addJobForm);
+  const payload = Object.fromEntries(formData.entries());
+  payload.date = payload.date || new Date().toISOString().slice(0, 10);
   try {
-    await api("/api/jobs", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-
-    addJobModal.classList.add("hidden");
-    addJobForm.reset();
+    await api("/api/jobs", { method: "POST", body: JSON.stringify(payload) });
+    dom.addJobForm.reset();
+    dom.addJobModal.classList.add("hidden");
+    await Promise.all([loadDashboard(), loadJobs()]);
     showToast("Job added");
-    await loadJobs();
-    await loadDashboard();
-    activateSection("tracker");
-  } catch (err) {
-    showToast(err.message || "Failed to add job");
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-async function updateJobStatus(id, status) {
+async function handleJobListClick(event) {
+  const row = event.target.closest("[data-job-id]");
+  if (!row) return;
+  const jobId = row.dataset.jobId;
+
+  if (event.target.dataset.action === "delete") {
+    try {
+      await api(`/api/jobs/${jobId}`, { method: "DELETE" });
+      await Promise.all([loadDashboard(), loadJobs()]);
+      showToast("Job deleted");
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
+}
+
+async function handleJobListChange(event) {
+  const row = event.target.closest("[data-job-id]");
+  if (!row || event.target.dataset.action !== "status") return;
   try {
-    await api(`/api/jobs/${id}`, {
+    await api(`/api/jobs/${row.dataset.jobId}`, {
       method: "PUT",
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status: event.target.value })
     });
+    await Promise.all([loadDashboard(), loadJobs()]);
     showToast("Status updated");
-    await loadJobs();
-    await loadDashboard();
-  } catch (err) {
-    showToast(err.message || "Failed to update");
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-async function deleteJob(id) {
-  try {
-    await api(`/api/jobs/${id}`, { method: "DELETE" });
-    showToast("Job deleted");
-    await loadJobs();
-    await loadDashboard();
-  } catch (err) {
-    showToast(err.message || "Delete failed");
-  }
-}
-
-// --------------------
-// Profile / Settings
-// --------------------
-async function analyzeResume() {
+async function handleResumeAnalyze() {
   try {
     const data = await api("/api/resume/analyze", {
       method: "POST",
-      body: JSON.stringify({ resume_text: resumeBox.value })
+      body: JSON.stringify({ resume_text: dom.resumeBox.value })
     });
-    parsedProfileOutput.textContent = JSON.stringify(data.parsed_profile || {}, null, 2);
+    state.parsedProfile = data.parsed_profile || {};
+    renderProfile();
     showToast("Resume analyzed");
-  } catch (err) {
-    showToast(err.message || "Analyze failed");
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-async function saveResume() {
+async function handleResumeSave() {
   try {
-    const parsed = JSON.parse(parsedProfileOutput.textContent || "{}");
     await api("/api/resume/save", {
       method: "POST",
-      body: JSON.stringify({
-        resume_text: resumeBox.value,
-        parsed_profile: parsed
-      })
+      body: JSON.stringify({ resume_text: dom.resumeBox.value, parsed_profile: state.parsedProfile })
     });
-    showToast("Resume saved");
-  } catch (err) {
-    showToast(err.message || "Save failed");
+    showToast("Profile saved");
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-async function saveKeywords() {
+async function handleKeywordsSave() {
   try {
-    const keywords = keywordBox.value
-      .split("\n")
-      .map(x => x.trim())
-      .filter(Boolean);
-
     await api("/api/keywords", {
       method: "POST",
-      body: JSON.stringify({ keywords })
+      body: JSON.stringify({ keywords: normalizeKeywordLines(dom.keywordBox.value) })
     });
     showToast("Keywords saved");
-  } catch (err) {
-    showToast(err.message || "Keyword save failed");
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-async function saveSettings() {
+async function handleSettingsSave() {
   try {
-    await api("/api/settings", {
+    const data = await api("/api/settings", {
       method: "POST",
       body: JSON.stringify({
-        sync_window_hours: Number(syncWindow.value || 24),
-        preferred_location: preferredLocation.value.trim(),
-        user_notes: userNotes.value.trim()
+        sync_window_hours: Number(dom.syncWindow.value || 24),
+        preferred_location: dom.preferredLocation.value,
+        user_notes: dom.userNotes.value
       })
     });
+    state.settings = data.settings || {};
+    renderSettings();
+    dom.gmailSyncStatus.textContent = data.gmail_sync?.message || "Not configured";
     showToast("Settings saved");
-  } catch (err) {
-    showToast(err.message || "Settings save failed");
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-// --------------------
-// Email parser
-// --------------------
-async function parseEmail() {
+async function handleEmailParse() {
   try {
     const data = await api("/api/email/parse", {
       method: "POST",
-      body: JSON.stringify({
-        email_text: emailParserInput.value,
-        job_id: emailJobLink.value || null
-      })
+      body: JSON.stringify({ email_text: dom.emailParserInput.value, job_id: dom.emailJobLink.value || null })
     });
-
-    parsedEmailStatus.textContent = data.status || "No signal detected";
-    parsedEmailReason.textContent = data.reason || "No explanation available";
+    dom.parsedEmailStatus.textContent = data.parsed?.status || "-";
+    dom.parsedEmailReason.textContent = data.parsed?.reason || "-";
+    await Promise.all([loadDashboard(), loadJobs()]);
     showToast("Email parsed");
-
-    await loadJobs();
-    await loadDashboard();
-  } catch (err) {
-    showToast(err.message || "Email parsing failed");
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-// --------------------
-// Chat
-// --------------------
-function appendChatBubble(text, role = "assistant") {
-  const bubble = document.createElement("div");
-  bubble.className = role === "user"
-    ? "rounded-2xl bg-blue-600 text-white p-3 text-sm ml-8"
-    : "rounded-2xl bg-white border border-slate-200 p-3 text-sm mr-8 text-slate-700";
-  bubble.textContent = text;
-  chatMessages.appendChild(bubble);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-async function handleChat(e) {
-  e.preventDefault();
-  const message = chatInput.value.trim();
-  if (!message) return;
-
-  appendChatBubble(message, "user");
-  chatInput.value = "";
-
+async function handleChat(event) {
+  event.preventDefault();
   try {
     const data = await api("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ message: dom.chatInput.value })
     });
-    appendChatBubble(data.answer || "No response from AI.", "assistant");
-  } catch (err) {
-    appendChatBubble(err.message || "Chat failed", "assistant");
+    state.chatHistory = data.history || [];
+    dom.chatInput.value = "";
+    renderChatHistory();
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
-// --------------------
-// Events
-// --------------------
-loginForm?.addEventListener("submit", handleLogin);
-logoutBtn?.addEventListener("click", handleLogout);
-mobileLogoutBtn?.addEventListener("click", handleLogout);
-
-navButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    const section = btn.dataset.section;
-    if (section) activateSection(section);
+function attachEvents() {
+  dom.loginForm.addEventListener("submit", handleLogin);
+  dom.logoutBtn.addEventListener("click", handleLogout);
+  dom.navButtons.forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
+  dom.refreshDashboardBtn.addEventListener("click", loadDashboard);
+  dom.jobsRefreshBtn.addEventListener("click", loadJobs);
+  dom.openAddJobBtn.addEventListener("click", () => dom.addJobModal.classList.remove("hidden"));
+  dom.closeAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
+  dom.cancelAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
+  dom.addJobForm.addEventListener("submit", handleAddJob);
+  dom.jobsSearchInput.addEventListener("input", renderJobsList);
+  dom.jobsStatusFilter.addEventListener("change", renderJobsList);
+  dom.jobsList.addEventListener("click", handleJobListClick);
+  dom.jobsList.addEventListener("change", handleJobListChange);
+  dom.analyzeResumeBtn.addEventListener("click", handleResumeAnalyze);
+  dom.saveResumeBtn.addEventListener("click", handleResumeSave);
+  dom.saveKeywordsBtn.addEventListener("click", handleKeywordsSave);
+  dom.saveSettingsBtn.addEventListener("click", handleSettingsSave);
+  dom.parseEmailBtn.addEventListener("click", handleEmailParse);
+  dom.chatForm.addEventListener("submit", handleChat);
+  dom.resumeUploadBtn.addEventListener("click", () => dom.resumeUpload.click());
+  dom.coverLetterUploadBtn.addEventListener("click", () => dom.coverLetterUpload.click());
+  dom.resumeUpload.addEventListener("change", () => setUploadStatus(dom.resumeUpload, dom.resumeUploadStatus));
+  dom.coverLetterUpload.addEventListener("change", () => setUploadStatus(dom.coverLetterUpload, dom.coverLetterUploadStatus));
+  dom.addJobModal.addEventListener("click", event => {
+    if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden");
   });
-});
+}
 
-mobileMenuBtn?.addEventListener("click", () => {
-  mobileMenu?.classList.toggle("hidden");
-});
-
-openAddJobBtn?.addEventListener("click", () => addJobModal.classList.remove("hidden"));
-jobsAddBtn?.addEventListener("click", () => addJobModal.classList.remove("hidden"));
-closeAddJobModal?.addEventListener("click", () => addJobModal.classList.add("hidden"));
-cancelAddJobModal?.addEventListener("click", () => addJobModal.classList.add("hidden"));
-
-addJobForm?.addEventListener("submit", createJob);
-
-refreshDashboardBtn?.addEventListener("click", async () => {
-  await loadDashboard();
-  await loadJobs();
-  showToast("Dashboard refreshed");
-});
-
-jobsRefreshBtn?.addEventListener("click", async () => {
-  await loadJobs();
-  showToast("Jobs refreshed");
-});
-
-jobsSearchInput?.addEventListener("input", renderJobsList);
-jobsStatusFilter?.addEventListener("change", renderJobsList);
-jobsCompanyFilter?.addEventListener("input", renderJobsList);
-
-analyzeResumeBtn?.addEventListener("click", analyzeResume);
-analyzeResumeTopBtn?.addEventListener("click", analyzeResume);
-saveResumeBtn?.addEventListener("click", saveResume);
-saveKeywordsBtn?.addEventListener("click", saveKeywords);
-saveSettingsBtn?.addEventListener("click", saveSettings);
-parseEmailBtn?.addEventListener("click", parseEmail);
-
-chatForm?.addEventListener("submit", handleChat);
-
-// --------------------
-// Init
-// --------------------
 window.addEventListener("DOMContentLoaded", async () => {
-  lucide.createIcons();
+  attachEvents();
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
   await checkAuth();
 });
