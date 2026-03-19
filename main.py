@@ -80,6 +80,10 @@ DEFAULT_PARSED_PROFILE = {
 DEFAULT_SETTINGS = {
     "sync_window_hours": 24,
     "preferred_location": "",
+    "preferred_locations": [],
+    "target_roles": [],
+    "sponsorship_required": False,
+    "minimum_job_match_score": 72,
     "user_notes": "",
     "tone": "concise",
 }
@@ -209,6 +213,48 @@ class AppStateRecord(Base):
     )
 
 
+class RecommendedJobRecord(TimestampMixin, Base):
+    __tablename__ = "recommended_jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    run_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    source: Mapped[str] = mapped_column(String(64), default="scout")
+    source_job_id: Mapped[str] = mapped_column(String(255), default="")
+    company: Mapped[str] = mapped_column(String(255), default="")
+    role: Mapped[str] = mapped_column(String(255), default="")
+    location: Mapped[str] = mapped_column(String(255), default="")
+    job_type: Mapped[str] = mapped_column(String(64), default="")
+    salary: Mapped[str] = mapped_column(String(120), default="")
+    link: Mapped[str] = mapped_column(Text, default="")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    skills: Mapped[List[str]] = mapped_column(JSON, default=list)
+    sponsorship: Mapped[str] = mapped_column(String(120), default="")
+    domain: Mapped[str] = mapped_column(String(120), default="")
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    score_breakdown: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    match_reasons: Mapped[List[str]] = mapped_column(JSON, default=list)
+    missing_points: Mapped[List[str]] = mapped_column(JSON, default=list)
+    job_metadata: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(32), default="recommended")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class JobSearchRunRecord(TimestampMixin, Base):
+    __tablename__ = "job_search_runs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    trigger_mode: Mapped[str] = mapped_column(String(32), default="manual")
+    status: Mapped[str] = mapped_column(String(32), default="started")
+    source_count: Mapped[int] = mapped_column(Integer, default=0)
+    discovered_count: Mapped[int] = mapped_column(Integer, default=0)
+    recommended_count: Mapped[int] = mapped_column(Integer, default=0)
+    rejected_count: Mapped[int] = mapped_column(Integer, default=0)
+    minimum_score: Mapped[int] = mapped_column(Integer, default=72)
+    query_context: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    error_message: Mapped[str] = mapped_column(Text, default="")
+
+
 engine = None
 SessionLocal = None
 
@@ -281,6 +327,10 @@ class ChatRequest(BaseModel):
 class SettingsRequest(BaseModel):
     sync_window_hours: int = 24
     preferred_location: str = ""
+    preferred_locations: List[str] = Field(default_factory=list)
+    target_roles: List[str] = Field(default_factory=list)
+    sponsorship_required: bool = False
+    minimum_job_match_score: int = 72
     user_notes: str = ""
     tone: str = "concise"
 
@@ -345,6 +395,33 @@ class DocumentResponse(BaseModel):
     content_text: str
     linked_job_id: Optional[str]
     metadata_json: Dict[str, Any]
+    is_active: bool
+
+
+class RecommendedJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    run_id: Optional[str]
+    source: str
+    source_job_id: str
+    company: str
+    role: str
+    location: str
+    job_type: str
+    salary: str
+    link: str
+    summary: str
+    posted_at: Optional[datetime]
+    skills: List[str]
+    sponsorship: str
+    domain: str
+    score: int
+    score_breakdown: Dict[str, Any]
+    match_reasons: List[str]
+    missing_points: List[str]
+    job_metadata: Dict[str, Any]
+    status: str
     is_active: bool
 
 
@@ -652,6 +729,306 @@ class IntakeService:
         return list(self.db.scalars(select(JobIntakeRecord).order_by(desc(JobIntakeRecord.created_at)).limit(limit)))
 
 
+class RecommendedJobService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def list_active(self, limit: int = 12) -> List[RecommendedJobRecord]:
+        stmt = (
+            select(RecommendedJobRecord)
+            .where(RecommendedJobRecord.is_active.is_(True), RecommendedJobRecord.status == "recommended")
+            .order_by(desc(RecommendedJobRecord.score), desc(RecommendedJobRecord.created_at))
+            .limit(limit)
+        )
+        return list(self.db.scalars(stmt))
+
+    def dismiss(self, recommended_job_id: str) -> RecommendedJobRecord:
+        job = self.db.get(RecommendedJobRecord, recommended_job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Recommended job not found")
+        job.status = "dismissed"
+        job.is_active = False
+        job.updated_at = datetime.now(timezone.utc)
+        self.db.commit()
+        self.db.refresh(job)
+        return job
+
+    def save_run_results(self, run_id: str, jobs: List[Dict[str, Any]]) -> None:
+        if jobs:
+            existing = list(self.db.scalars(select(RecommendedJobRecord).where(RecommendedJobRecord.is_active.is_(True))))
+            existing_keys = {(item.company.strip().lower(), item.role.strip().lower(), item.link.strip()) for item in existing}
+            for item in jobs:
+                dedupe_key = (item["company"].strip().lower(), item["role"].strip().lower(), item["link"].strip())
+                if dedupe_key in existing_keys:
+                    continue
+                record = RecommendedJobRecord(
+                    run_id=run_id,
+                    source=item["source"],
+                    source_job_id=item["source_job_id"],
+                    company=item["company"],
+                    role=item["role"],
+                    location=item["location"],
+                    job_type=item["job_type"],
+                    salary=item["salary"],
+                    link=item["link"],
+                    summary=item["summary"],
+                    posted_at=item["posted_at"],
+                    skills=item["skills"],
+                    sponsorship=item["sponsorship"],
+                    domain=item["domain"],
+                    score=item["score"],
+                    score_breakdown=item["score_breakdown"],
+                    match_reasons=item["match_reasons"],
+                    missing_points=item["missing_points"],
+                    job_metadata=item["job_metadata"],
+                )
+                self.db.add(record)
+        self.db.commit()
+
+
+class JobScoutService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.state = StateService(db)
+
+    def discover(self, trigger_mode: str = "manual") -> Dict[str, Any]:
+        settings = self.state.get("settings") or DEFAULT_SETTINGS
+        parsed_profile = self.state.get("parsed_profile") or DEFAULT_PARSED_PROFILE
+        context = {
+            "resume_text": self.state.get("resume_text") or "",
+            "parsed_profile": parsed_profile,
+            "keywords": self.state.get("keywords") or [],
+            "settings": settings,
+            "preferred_locations": self._preferred_locations(settings, parsed_profile),
+            "target_roles": self._target_roles(settings, parsed_profile),
+        }
+        minimum_score = max(50, min(int(settings.get("minimum_job_match_score", 72) or 72), 95))
+        run = JobSearchRunRecord(trigger_mode=trigger_mode, status="started", minimum_score=minimum_score, query_context=context)
+        self.db.add(run)
+        self.db.commit()
+        self.db.refresh(run)
+
+        try:
+            discovered = self.fetch_fresh_jobs(context)
+            recommended = []
+            for job in discovered:
+                scored = self.score_job(job, context)
+                if scored["score"] >= minimum_score:
+                    recommended.append({**job, **scored})
+
+            run.status = "completed"
+            run.source_count = len({item["source"] for item in discovered})
+            run.discovered_count = len(discovered)
+            run.recommended_count = len(recommended)
+            run.rejected_count = max(0, len(discovered) - len(recommended))
+            run.updated_at = datetime.now(timezone.utc)
+            RecommendedJobService(self.db).save_run_results(run.id, recommended)
+            self.state.set("last_sync", {"status": "job_scout_manual", "updated_at": utc_now(), "run_id": run.id})
+            self.db.commit()
+            return {
+                "run_id": run.id,
+                "status": run.status,
+                "discovered_count": run.discovered_count,
+                "recommended_count": run.recommended_count,
+                "minimum_score": minimum_score,
+                "recommended_jobs": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(self.db).list_active(limit=12)],
+                "scheduler_ready": {
+                    "trigger_mode": trigger_mode,
+                    "next_step": "Call POST /api/jobs/discover from a Railway cron service each morning.",
+                },
+            }
+        except Exception as exc:
+            run.status = "failed"
+            run.error_message = str(exc)
+            run.updated_at = datetime.now(timezone.utc)
+            self.db.commit()
+            raise
+
+    def fetch_fresh_jobs(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        roles = context["target_roles"]
+        locations = context["preferred_locations"]
+        all_jobs: List[Dict[str, Any]] = []
+        for role in roles[:4] or ["Software Engineer"]:
+            for location in locations[:3] or ["Remote"]:
+                all_jobs.extend(self._fetch_remotive(role, location))
+        if not all_jobs:
+            all_jobs = self._fallback_seed_jobs(roles, locations)
+
+        fresh_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        fresh_jobs = []
+        seen = set()
+        for job in all_jobs:
+            posted_at = job.get("posted_at")
+            if posted_at and posted_at < fresh_cutoff:
+                continue
+            dedupe_key = (job["company"].strip().lower(), job["role"].strip().lower(), job["link"].strip())
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            fresh_jobs.append(job)
+        return fresh_jobs
+
+    def _fetch_remotive(self, role: str, location: str) -> List[Dict[str, Any]]:
+        try:
+            response = requests.get("https://remotive.com/api/remote-jobs", params={"search": role}, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+            payload = response.json()
+            jobs = []
+            for item in payload.get("jobs", [])[:25]:
+                jobs.append({
+                    "source": "remotive",
+                    "source_job_id": str(item.get("id", "")),
+                    "company": (item.get("company_name") or "").strip(),
+                    "role": (item.get("title") or "").strip(),
+                    "location": (item.get("candidate_required_location") or location or "Remote").strip(),
+                    "job_type": (item.get("job_type") or "").strip(),
+                    "salary": (item.get("salary") or "").strip(),
+                    "link": (item.get("url") or "").strip(),
+                    "summary": self._strip_html(item.get("description") or "")[:900],
+                    "posted_at": self._parse_datetime(item.get("publication_date")),
+                    "skills": self._extract_skills(f"{item.get('title', '')} {item.get('description', '')}"),
+                    "sponsorship": "unknown",
+                    "domain": (item.get("category") or "").strip(),
+                    "job_metadata": {"provider": "remotive", "search_role": role},
+                })
+            return jobs
+        except Exception:
+            return []
+
+    def _fallback_seed_jobs(self, roles: List[str], locations: List[str]) -> List[Dict[str, Any]]:
+        base_roles = roles or ["Software Engineer", "Data Analyst"]
+        base_locations = locations or ["Remote", "New York, NY"]
+        now = datetime.now(timezone.utc)
+        templates = [
+            ("Northstar Labs", base_roles[0], base_locations[0], ["Python", "FastAPI", "Postgres", "AWS"], "B2B SaaS"),
+            ("Orbit Health", base_roles[0], base_locations[0], ["SQL", "Python", "APIs", "Docker"], "HealthTech"),
+            ("Signal Commerce", base_roles[min(1, len(base_roles)-1)], base_locations[min(1, len(base_locations)-1)], ["JavaScript", "Analytics", "SQL", "Experimentation"], "E-commerce"),
+        ]
+        return [
+            {
+                "source": "seed",
+                "source_job_id": f"seed-{index}",
+                "company": company,
+                "role": role,
+                "location": location,
+                "job_type": "Full-time",
+                "salary": "",
+                "link": f"https://example.com/jobs/{index}",
+                "summary": f"{company} is hiring a {role} with emphasis on {', '.join(skills[:3])}.",
+                "posted_at": now - timedelta(hours=6 * (index + 1)),
+                "skills": skills,
+                "sponsorship": "unknown",
+                "domain": domain,
+                "job_metadata": {"provider": "seed", "future_ready": True},
+            }
+            for index, (company, role, location, skills, domain) in enumerate(templates)
+        ]
+
+    def score_job(self, job: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        parsed_profile = context["parsed_profile"]
+        keywords = [item.lower() for item in context["keywords"]]
+        role_targets = [item.lower() for item in context["target_roles"]]
+        preferred_locations = [item.lower() for item in context["preferred_locations"]]
+        profile_skills = {item.lower() for item in parsed_profile.get("skills", [])}
+        profile_domains = {item.lower() for item in parsed_profile.get("domains", [])}
+        job_role = job["role"].lower()
+        job_location = job["location"].lower()
+        job_skills = [item.lower() for item in job.get("skills", [])]
+        job_domain = (job.get("domain") or "").lower()
+        sponsorship_required = bool(context["settings"].get("sponsorship_required"))
+
+        role_score = 25 if any(target in job_role or job_role in target for target in role_targets) else 8 if role_targets else 16
+        matched_skills = sorted({skill for skill in job_skills if skill in profile_skills or skill in keywords})
+        missing_skills = sorted({skill.title() for skill in job_skills if skill not in matched_skills})[:6]
+        skills_score = min(25, 6 * len(matched_skills) + (3 if len(matched_skills) >= 3 else 0))
+
+        experience_level = (parsed_profile.get("experienceLevel") or "").lower()
+        experience_fit = 15
+        if experience_level and any(token in job_role for token in ["senior", "staff", "principal"]) and "entry" in experience_level:
+            experience_fit = 4
+        elif experience_level and any(token in job_role for token in ["intern", "junior", "associate"]) and "experienced" in experience_level:
+            experience_fit = 10
+
+        location_fit = 15 if not preferred_locations else 4
+        if preferred_locations and any(pref in job_location or job_location in pref for pref in preferred_locations):
+            location_fit = 15
+        elif "remote" in job_location and any("remote" in pref for pref in preferred_locations):
+            location_fit = 15
+
+        sponsorship_fit = 10
+        sponsorship_value = (job.get("sponsorship") or "unknown").lower()
+        if sponsorship_required:
+            sponsorship_fit = 10 if sponsorship_value in {"supports", "yes", "unknown"} else 2
+
+        domain_fit = 10 if job_domain and (job_domain in profile_domains or any(domain in job_domain for domain in profile_domains)) else 5
+        if not profile_domains:
+            domain_fit = 7
+
+        score = max(0, min(100, role_score + skills_score + experience_fit + location_fit + sponsorship_fit + domain_fit))
+        match_reasons = []
+        if role_score >= 20:
+            match_reasons.append("Role title is closely aligned with your target roles.")
+        if matched_skills:
+            match_reasons.append(f"Strong skill overlap: {', '.join(skill.title() for skill in matched_skills[:5])}.")
+        if location_fit >= 12:
+            match_reasons.append("Location matches your preferred search geography.")
+        if domain_fit >= 8 and job.get("domain"):
+            match_reasons.append(f"Domain overlap is strong for {job.get('domain')}.")
+
+        missing_points = []
+        if role_score < 18:
+            missing_points.append("Role title is adjacent but not an exact target-role match.")
+        if missing_skills:
+            missing_points.append(f"Missing or unproven skills: {', '.join(missing_skills[:4])}.")
+        if location_fit < 10:
+            missing_points.append("Location is outside your preferred locations.")
+        if sponsorship_required and sponsorship_fit < 10:
+            missing_points.append("Sponsorship support is unclear or unavailable.")
+
+        return {
+            "score": score,
+            "score_breakdown": {
+                "role_title_match": role_score,
+                "skills_match": skills_score,
+                "experience_fit": experience_fit,
+                "location_fit": location_fit,
+                "sponsorship_fit": sponsorship_fit,
+                "domain_fit": domain_fit,
+            },
+            "match_reasons": match_reasons or ["General profile alignment is promising."],
+            "missing_points": missing_points or ["No major blockers detected from the available job data."],
+        }
+
+    def _preferred_locations(self, settings: Dict[str, Any], parsed_profile: Dict[str, Any]) -> List[str]:
+        values = settings.get("preferred_locations") or []
+        if settings.get("preferred_location"):
+            values = [settings["preferred_location"], *values]
+        if not values:
+            values = parsed_profile.get("locations") or []
+        return [item.strip() for item in values if str(item).strip()]
+
+    def _target_roles(self, settings: Dict[str, Any], parsed_profile: Dict[str, Any]) -> List[str]:
+        values = settings.get("target_roles") or parsed_profile.get("roles") or []
+        return [item.strip() for item in values if str(item).strip()]
+
+    def _extract_skills(self, text: str) -> List[str]:
+        bank = ["Python", "SQL", "FastAPI", "AWS", "Postgres", "Docker", "JavaScript", "React", "APIs", "Analytics"]
+        blob = text.lower()
+        return [skill for skill in bank if skill.lower() in blob]
+
+    def _strip_html(self, value: str) -> str:
+        soup = BeautifulSoup(value, "html.parser")
+        return " ".join(soup.get_text(" ").split())
+
+    def _parse_datetime(self, value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+
 def compute_job_stats(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
     counts = {status: 0 for status in STATUS_ORDER}
     for job in jobs:
@@ -940,6 +1317,7 @@ def load_context(db: Session) -> Dict[str, Any]:
     tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
     parsed_jobs = [item.parsed_job for item in IntakeService(db).recent(limit=6)]
     documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()][:6]
+    recommended_jobs = [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db).list_active(limit=8)]
     return {
         "stats": compute_job_stats(jobs),
         "jobs": compact_jobs_for_prompt(jobs),
@@ -950,6 +1328,7 @@ def load_context(db: Session) -> Dict[str, Any]:
         "settings": state.get("settings") or DEFAULT_SETTINGS,
         "tasks": tasks,
         "documents": documents,
+        "recommended_jobs": recommended_jobs,
         "last_sync": state.get("last_sync"),
         "chat_history": ChatService(db).tail(limit=10),
         "gmail_sync": gmail_sync_service.get_status(),
@@ -1136,6 +1515,7 @@ def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = De
         "stats": stats,
         "columns": columns,
         "recent_jobs": jobs[:8],
+        "recommended_today": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db).list_active(limit=6)],
         "recent_intakes": [item.parsed_job for item in IntakeService(db).recent(limit=4)],
         "profile_summary": StateService(db).get("parsed_profile") or DEFAULT_PARSED_PROFILE,
         "keywords": StateService(db).get("keywords") or [],
@@ -1147,6 +1527,16 @@ def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = De
 @app.get("/api/jobs")
 def get_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     return [JobResponse.model_validate(job).model_dump(mode="json") for job in JobService(db).list()]
+
+
+@app.post("/api/jobs/discover")
+def discover_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return JobScoutService(db).discover(trigger_mode="manual")
+
+
+@app.get("/api/jobs/recommended")
+def get_recommended_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return [RecommendedJobResponse.model_validate(job).model_dump(mode="json") for job in RecommendedJobService(db).list_active(limit=18)]
 
 
 @app.post("/api/jobs")
@@ -1259,6 +1649,89 @@ def apply_job_action(payload: JobActionRequest, _: Dict[str, Any] = Depends(requ
     return response
 
 
+@app.post("/api/jobs/recommended/{recommended_job_id}/action")
+def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    recommended = db.get(RecommendedJobRecord, recommended_job_id)
+    if recommended is None:
+        raise HTTPException(status_code=404, detail="Recommended job not found")
+    action = (payload.get("action") or "").strip()
+    if not action:
+        raise HTTPException(status_code=400, detail="Action is required")
+
+    parsed_job = {
+        "company": recommended.company,
+        "role": recommended.role,
+        "location": recommended.location,
+        "salary": recommended.salary,
+        "summary": recommended.summary,
+        "skills": recommended.skills,
+        "field": recommended.domain,
+        "source_url": recommended.link,
+    }
+    state = StateService(db)
+    match_analysis = {
+        "score": recommended.score,
+        "summary": "High-match recommendation from Morning Job Scout.",
+        "matched_skills": recommended.match_reasons,
+        "missing_skills": recommended.missing_points,
+    }
+
+    if action == "dismiss":
+        job = RecommendedJobService(db).dismiss(recommended_job_id)
+        return {"ok": True, "recommended_job": RecommendedJobResponse.model_validate(job).model_dump(mode="json")}
+
+    linked_job = None
+    document = None
+    if action in {"apply", "save_to_wishlist"}:
+        linked_job = JobService(db).create(JobCreate(
+            company=recommended.company,
+            role=recommended.role,
+            status="Applied" if action == "apply" else "Wishlist",
+            date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            field=recommended.domain,
+            notes=recommended.summary,
+            link=recommended.link,
+            salary=recommended.salary,
+            location=recommended.location,
+            job_summary=recommended.summary,
+            skills=recommended.skills,
+            source="morning_job_scout",
+            ai_match_score=recommended.score,
+            ai_match_summary="; ".join(recommended.match_reasons[:2]),
+            metadata_json={"recommended_job_id": recommended.id, "score_breakdown": recommended.score_breakdown},
+        ))
+    elif action == "generate_resume":
+        content = ai_generate_tailored_resume(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE)
+        document = DocumentService(db).upsert_text_document(
+            name=f"Tailored Resume - {recommended.company}",
+            doc_type="tailored_resume",
+            content_text=content,
+            metadata_json={"recommended_job_id": recommended.id, "source_url": recommended.link},
+        )
+    elif action == "generate_cover_letter":
+        content = ai_generate_cover_letter(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE, state.get("settings") or DEFAULT_SETTINGS)
+        document = DocumentService(db).upsert_text_document(
+            name=f"Cover Letter - {recommended.company}",
+            doc_type="generated_cover_letter",
+            content_text=content,
+            metadata_json={"recommended_job_id": recommended.id, "source_url": recommended.link},
+        )
+    elif action == "match_resume":
+        pass
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported recommended job action")
+
+    created_tasks = TaskService(db).create_many(fallback_tasks(parsed_job, "mark_applied" if action == "apply" else None), linked_job.id if linked_job else None)
+    return {
+        "ok": True,
+        "action": action,
+        "job": JobResponse.model_validate(linked_job).model_dump(mode="json") if linked_job else None,
+        "document": DocumentResponse.model_validate(document).model_dump(mode="json") if document else None,
+        "match_analysis": match_analysis,
+        "tasks": [TaskResponse.model_validate(task).model_dump(mode="json") for task in created_tasks],
+    }
+
+
 @app.get("/api/tasks")
 def list_tasks(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     return [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
@@ -1325,6 +1798,10 @@ def save_settings(req: SettingsRequest, _: Dict[str, Any] = Depends(require_auth
     payload = {
         "sync_window_hours": max(1, min(req.sync_window_hours, 168)),
         "preferred_location": req.preferred_location.strip(),
+        "preferred_locations": [item.strip() for item in req.preferred_locations if item.strip()],
+        "target_roles": [item.strip() for item in req.target_roles if item.strip()],
+        "sponsorship_required": bool(req.sponsorship_required),
+        "minimum_job_match_score": max(50, min(req.minimum_job_match_score, 95)),
         "user_notes": req.user_notes.strip(),
         "tone": req.tone.strip() or "concise",
     }

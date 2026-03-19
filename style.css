@@ -177,6 +177,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .filters-grid { grid-template-columns: 1.5fr 220px; }
 .parse-results-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr); }
 .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.recommended-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .two-column { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
@@ -191,6 +192,23 @@ h1, h2, h3, h4, p { margin-top: 0; }
   border: 1px solid var(--border);
   background: rgba(2, 6, 23, 0.62);
 }
+.recommended-card { padding: 20px; display: grid; gap: 14px; }
+.score-badge {
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  color: #bbf7d0;
+  font-weight: 800;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+  font-weight: 500;
+}
+.checkbox-row input { width: 18px; height: 18px; }
 .board-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(210px, 1fr));
@@ -248,6 +266,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .chat-bubble span { display: inline-block; margin-bottom: 8px; color: var(--muted); text-transform: uppercase; font-size: 12px; }
 .chat-form { gap: 10px; align-items: stretch; }
 .chat-form .field { flex: 1; }
+.chip-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .modal {
   position: fixed;
   inset: 0;
@@ -258,6 +277,18 @@ h1, h2, h3, h4, p { margin-top: 0; }
   z-index: 50;
 }
 .modal-card { width: min(100%, 620px); padding: 26px; }
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  z-index: 60;
+}
+.empty-state { padding: 18px; color: var(--muted); }
 .modal-wide { width: min(1180px, 100%); }
 .action-grid { display: grid; gap: 10px; }
 .action-card {

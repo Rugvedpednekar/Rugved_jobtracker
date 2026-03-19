@@ -134,6 +134,21 @@
               <div id="tasks-list" class="task-list"></div>
             </div>
           </div>
+
+          <article class="panel stack-md">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Morning Job Scout</p>
+                <h2>Recommended Today</h2>
+              </div>
+              <div class="inline-actions">
+                <span class="muted">Only high-score matches are shown.</span>
+                <button id="discover-jobs-btn" class="btn btn-primary" type="button">Run morning scan</button>
+              </div>
+            </div>
+            <div id="recommended-meta" class="muted">Load your best-fit opportunities for today.</div>
+            <div id="recommended-jobs-list" class="recommended-grid"></div>
+          </article>
         </section>
 
         <section id="jobs" class="section-panel stack-lg hidden">
@@ -244,6 +259,16 @@
               <input id="sync-window" class="field" type="number" min="1" max="168" />
               <label class="label" for="preferred-location">Preferred location</label>
               <input id="preferred-location" class="field" type="text" placeholder="Remote, NYC, Seattle..." />
+              <label class="label" for="preferred-locations">Preferred locations list</label>
+              <textarea id="preferred-locations" class="field textarea-md" placeholder="One preferred location per line"></textarea>
+              <label class="label" for="target-roles">Target roles</label>
+              <textarea id="target-roles" class="field textarea-md" placeholder="One target role per line"></textarea>
+              <label class="label" for="minimum-job-match-score">Minimum match score</label>
+              <input id="minimum-job-match-score" class="field" type="number" min="50" max="95" />
+              <label class="checkbox-row" for="sponsorship-required">
+                <input id="sponsorship-required" type="checkbox" />
+                <span>I need jobs that are sponsorship-friendly</span>
+              </label>
               <label class="label" for="tone-setting">Assistant tone</label>
               <input id="tone-setting" class="field" type="text" placeholder="Concise, confident, direct" />
               <label class="label" for="user-notes">Notes</label>

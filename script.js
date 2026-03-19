@@ -4,6 +4,7 @@ const TASK_STATUSES = ["open", "in_progress", "done"];
 
 const state = {
   jobs: [],
+  recommendedJobs: [],
   tasks: [],
   documents: [],
   parsedProfile: {},
@@ -27,6 +28,7 @@ const dom = {
   logoutBtn: document.getElementById("logout-btn"),
   refreshDashboardBtn: document.getElementById("refresh-dashboard-btn"),
   jobsRefreshBtn: document.getElementById("jobs-refresh-btn"),
+  discoverJobsBtn: document.getElementById("discover-jobs-btn"),
   openAddJobBtn: document.getElementById("open-add-job"),
   addJobModal: document.getElementById("add-job-modal"),
   addJobForm: document.getElementById("add-job-form"),
@@ -74,6 +76,8 @@ const dom = {
   recentIntakes: document.getElementById("recent-intakes"),
   briefingSummary: document.getElementById("briefing-summary"),
   dailyBriefingText: document.getElementById("daily-briefing-text"),
+  recommendedMeta: document.getElementById("recommended-meta"),
+  recommendedJobsList: document.getElementById("recommended-jobs-list"),
   followupList: document.getElementById("followup-list"),
   focusList: document.getElementById("focus-list"),
   resumeBox: document.getElementById("resume-box"),
@@ -84,6 +88,10 @@ const dom = {
   saveKeywordsBtn: document.getElementById("save-keywords-btn"),
   syncWindow: document.getElementById("sync-window"),
   preferredLocation: document.getElementById("preferred-location"),
+  preferredLocations: document.getElementById("preferred-locations"),
+  targetRoles: document.getElementById("target-roles"),
+  minimumJobMatchScore: document.getElementById("minimum-job-match-score"),
+  sponsorshipRequired: document.getElementById("sponsorship-required"),
   toneSetting: document.getElementById("tone-setting"),
   userNotes: document.getElementById("user-notes"),
   saveSettingsBtn: document.getElementById("save-settings-btn"),
@@ -213,6 +221,46 @@ function renderDashboard() {
   dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
     ? data.recent_intakes.map(item => `<div class="list-item"><strong>${safeText(item.company)}</strong><p class="muted">${safeText(item.role)} • ${safeText(item.location, "Location pending")}</p></div>`).join("")
     : emptyState("Parsed jobs will appear here.");
+  if (data.recommended_today) {
+    state.recommendedJobs = data.recommended_today;
+  }
+  renderRecommendedJobs();
+}
+
+function renderRecommendedJobs() {
+  const jobs = state.recommendedJobs || [];
+  dom.recommendedMeta.textContent = jobs.length
+    ? `${jobs.length} high-match roles surfaced from the latest scan.`
+    : "No high-score matches yet. Run the morning scan after saving your profile and preferences.";
+  dom.recommendedJobsList.innerHTML = jobs.length ? jobs.map(job => `
+    <article class="recommended-card panel" data-recommended-job-id="${job.id}">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">${safeText(job.company, "Unknown company")}</p>
+          <h3>${safeText(job.role, "Unknown role")}</h3>
+        </div>
+        <div class="score-badge">${job.score || 0}/100</div>
+      </div>
+      <p class="muted">${safeText(job.location)} ${job.domain ? `• ${job.domain}` : ""}</p>
+      <p>${safeText(job.summary, "No summary available.")}</p>
+      <div>
+        <p class="label">Why it matches</p>
+        <div class="chip-row">${renderChips(job.match_reasons || [])}</div>
+      </div>
+      <div>
+        <p class="label">Missing skills / gaps</p>
+        <div class="chip-row">${renderChips(job.missing_points || [])}</div>
+      </div>
+      <div class="inline-actions">
+        <button class="btn btn-primary" data-recommended-action="apply" type="button">Apply</button>
+        <button class="btn btn-secondary" data-recommended-action="save_to_wishlist" type="button">Save to wishlist</button>
+        <button class="btn btn-ghost" data-recommended-action="dismiss" type="button">Dismiss</button>
+        <button class="btn btn-secondary" data-recommended-action="match_resume" type="button">Match resume</button>
+        <button class="btn btn-secondary" data-recommended-action="generate_resume" type="button">Generate resume</button>
+        <button class="btn btn-secondary" data-recommended-action="generate_cover_letter" type="button">Generate cover letter</button>
+      </div>
+    </article>
+  `).join("") : emptyState("Recommended jobs will appear here after the morning scan.");
 }
 
 function filteredJobs() {
@@ -268,6 +316,10 @@ function renderProfile() {
 function renderSettings() {
   dom.syncWindow.value = String(state.settings.sync_window_hours || 24);
   dom.preferredLocation.value = state.settings.preferred_location || "";
+  dom.preferredLocations.value = (state.settings.preferred_locations || []).join("\n");
+  dom.targetRoles.value = (state.settings.target_roles || []).join("\n");
+  dom.minimumJobMatchScore.value = String(state.settings.minimum_job_match_score || 72);
+  dom.sponsorshipRequired.checked = Boolean(state.settings.sponsorship_required);
   dom.userNotes.value = state.settings.user_notes || "";
   dom.toneSetting.value = state.settings.tone || "concise";
 }
@@ -359,6 +411,11 @@ async function loadJobs() {
   populateEmailJobDropdown();
 }
 
+async function loadRecommendedJobs() {
+  state.recommendedJobs = await api("/api/jobs/recommended");
+  renderRecommendedJobs();
+}
+
 async function loadProfile() {
   const profile = await api("/api/profile");
   dom.resumeBox.value = profile.resume_text || "";
@@ -390,7 +447,7 @@ async function loadDocuments() {
 }
 
 async function loadAllData() {
-  await Promise.all([loadDashboard(), loadJobs(), loadProfile(), loadSettings(), loadTasks(), loadDocuments()]);
+  await Promise.all([loadDashboard(), loadJobs(), loadRecommendedJobs(), loadProfile(), loadSettings(), loadTasks(), loadDocuments()]);
 }
 
 async function checkAuth() {
@@ -541,6 +598,10 @@ async function handleSettingsSave() {
       body: JSON.stringify({
         sync_window_hours: Number(dom.syncWindow.value || 24),
         preferred_location: dom.preferredLocation.value,
+        preferred_locations: normalizeKeywordLines(dom.preferredLocations.value),
+        target_roles: normalizeKeywordLines(dom.targetRoles.value),
+        sponsorship_required: dom.sponsorshipRequired.checked,
+        minimum_job_match_score: Number(dom.minimumJobMatchScore.value || 72),
         user_notes: dom.userNotes.value,
         tone: dom.toneSetting.value
       })
@@ -549,6 +610,47 @@ async function handleSettingsSave() {
     renderSettings();
     dom.gmailSyncStatus.textContent = data.gmail_sync?.message || "Not configured";
     showToast("Settings saved");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function handleDiscoverJobs() {
+  const button = dom.discoverJobsBtn;
+  button.disabled = true;
+  button.textContent = "Scanning...";
+  try {
+    const data = await api("/api/jobs/discover", { method: "POST" });
+    state.recommendedJobs = data.recommended_jobs || [];
+    renderRecommendedJobs();
+    await Promise.all([loadDashboard(), loadTasks()]);
+    showToast(`Morning scan finished: ${data.recommended_count || 0} matches`);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Run morning scan";
+  }
+}
+
+async function handleRecommendedJobClick(event) {
+  const button = event.target.closest("[data-recommended-action]");
+  const card = event.target.closest("[data-recommended-job-id]");
+  if (!button || !card) return;
+  try {
+    const data = await api(`/api/jobs/recommended/${card.dataset.recommendedJobId}/action`, {
+      method: "POST",
+      body: JSON.stringify({ action: button.dataset.recommendedAction })
+    });
+    if (data.document?.content_text) {
+      dom.generatedOutput.textContent = data.document.content_text;
+      dom.parseJobModal.classList.remove("hidden");
+    } else if (data.match_analysis) {
+      dom.generatedOutput.textContent = JSON.stringify(data.match_analysis, null, 2);
+      dom.parseJobModal.classList.remove("hidden");
+    }
+    await Promise.all([loadRecommendedJobs(), loadDashboard(), loadJobs(), loadTasks(), loadDocuments()]);
+    showToast("Recommended job action completed");
   } catch (error) {
     showToast(error.message);
   }
@@ -649,6 +751,7 @@ function attachEvents() {
   dom.navButtons.forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
   dom.refreshDashboardBtn.addEventListener("click", () => Promise.all([loadDashboard(), loadTasks()]));
   dom.jobsRefreshBtn.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
+  dom.discoverJobsBtn.addEventListener("click", handleDiscoverJobs);
   dom.openAddJobBtn.addEventListener("click", () => dom.addJobModal.classList.remove("hidden"));
   dom.closeAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
   dom.cancelAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
@@ -667,6 +770,7 @@ function attachEvents() {
   dom.saveKeywordsBtn.addEventListener("click", handleKeywordsSave);
   dom.saveSettingsBtn.addEventListener("click", handleSettingsSave);
   dom.parseEmailBtn.addEventListener("click", handleEmailParse);
+  dom.recommendedJobsList.addEventListener("click", handleRecommendedJobClick);
   dom.chatForm.addEventListener("submit", handleChat);
   dom.addJobModal.addEventListener("click", event => { if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden"); });
   dom.parseJobModal.addEventListener("click", event => { if (event.target === dom.parseJobModal) closeParseModal(); });
