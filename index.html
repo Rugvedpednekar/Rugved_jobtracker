@@ -3,744 +3,259 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JobTracker — Rugved Dashboard</title>
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-
+  <title>JobTracker Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
-
-  <style>
-  body {
-    font-family: "Inter", sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-  }
-
-  .section-panel {
-    display: none;
-  }
-
-  .section-panel.active {
-    display: block;
-  }
-
-  .nav-btn.active {
-    background: #1e3a8a;
-    color: white;
-  }
-
-  .board-scroll {
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
-  }
-
-  .board-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(260px, 1fr));
-    gap: 1rem;
-    min-width: 1320px;
-  }
-
-  .job-card {
-    border: 1px solid #334155;
-    border-left: 4px solid #3b82f6;
-    background: #1e293b;
-    border-radius: 16px;
-    padding: 14px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  }
-
-  .stat-card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 20px;
-    padding: 18px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  }
-
-  .soft-card {
-    background: #111827;
-    border: 1px solid #334155;
-    border-radius: 24px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  }
-
-  .field {
-    width: 100%;
-    border: 1px solid #475569;
-    border-radius: 14px;
-    padding: 12px 14px;
-    outline: none;
-    background: #0f172a;
-    color: #e2e8f0;
-  }
-
-  .field::placeholder {
-    color: #94a3b8;
-  }
-
-  .field:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
-  }
-
-  .btn-primary {
-    background: #2563eb;
-    color: white;
-    border-radius: 14px;
-    padding: 11px 16px;
-    font-weight: 700;
-  }
-
-  .btn-primary:hover {
-    background: #1d4ed8;
-  }
-
-  .btn-dark {
-    background: #020617;
-    color: white;
-    border-radius: 14px;
-    padding: 11px 16px;
-    font-weight: 700;
-  }
-
-  .btn-dark:hover {
-    background: #000000;
-  }
-
-  .btn-soft {
-    background: #1e293b;
-    color: #bfdbfe;
-    border: 1px solid #3b82f6;
-    border-radius: 14px;
-    padding: 11px 16px;
-    font-weight: 700;
-  }
-
-  .btn-soft:hover {
-    background: #334155;
-  }
-
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 9999px;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  .chip-blue {
-    background: #1e3a8a;
-    color: #dbeafe;
-  }
-
-  .chip-green {
-    background: #14532d;
-    color: #dcfce7;
-  }
-
-  .chip-yellow {
-    background: #78350f;
-    color: #fef3c7;
-  }
-
-  .chip-red {
-    background: #7f1d1d;
-    color: #fee2e2;
-  }
-
-  .login-bg {
-    background:
-      radial-gradient(circle at top left, rgba(37, 99, 235, 0.24), transparent 30%),
-      radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.18), transparent 30%),
-      #020617;
-  }
-
-  @media (max-width: 1024px) {
-    .desktop-nav {
-      display: none;
-    }
-  }
-
-  @media (min-width: 1025px) {
-    .mobile-nav {
-      display: none;
-    }
-  }
- </style>
+  <script defer src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="/script.js"></script>
 </head>
 <body>
-  <!-- LOGIN PAGE -->
-  <section id="login-screen" class="min-h-screen login-bg flex items-center justify-center px-4">
-    <div class="w-full max-w-md">
-      <div class="soft-card p-8">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
-            <i data-lucide="briefcase-business" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <h1 class="text-2xl font-extrabold tracking-tight">JobTracker</h1>
-            <p class="text-sm text-slate-500">Private personal dashboard</p>
-          </div>
-        </div>
-
-        <div class="mb-6">
-          <h2 class="text-2xl font-extrabold">Sign in</h2>
-          <p class="text-sm text-slate-500 mt-2">
-            Access your personal job tracker, AI assistant, resume context, and application pipeline.
-          </p>
-        </div>
-
-        <form id="login-form" class="space-y-4">
-          <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700">Email</label>
-            <input id="login-email" type="email" class="field" placeholder="you@example.com" required />
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700">Password</label>
-            <input id="login-password" type="password" class="field" placeholder="Enter your password" required />
-          </div>
-
-          <button type="submit" class="btn-primary w-full inline-flex items-center justify-center gap-2">
-            <i data-lucide="log-in" class="w-4 h-4"></i>
-            Login
-          </button>
-        </form>
-
-        <p id="login-error" class="hidden mt-4 text-sm font-medium text-red-600"></p>
-
-        <div class="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600">
-          This dashboard is protected and only available after successful authentication.
+  <section id="login-screen" class="screen screen-login">
+    <div class="login-card panel">
+      <div class="brand-row">
+        <div class="brand-icon"><i data-lucide="briefcase-business"></i></div>
+        <div>
+          <h1>JobTracker</h1>
+          <p>Private Railway dashboard</p>
         </div>
       </div>
+      <div class="login-copy">
+        <h2>Sign in</h2>
+        <p>Use your configured dashboard credentials to access your job pipeline, resume profile, settings, and AI assistant.</p>
+      </div>
+      <form id="login-form" class="stack-md">
+        <label class="label" for="login-email">Email</label>
+        <input id="login-email" class="field" type="email" placeholder="you@example.com" required />
+        <label class="label" for="login-password">Password</label>
+        <input id="login-password" class="field" type="password" placeholder="Enter password" required />
+        <button class="btn btn-primary" type="submit">Login</button>
+      </form>
+      <p id="login-error" class="message error hidden"></p>
     </div>
   </section>
 
-  <!-- APP -->
-  <div id="app-shell" class="hidden min-h-screen">
-    <!-- TOP NAV -->
-    <header class="sticky top-0 z-40 bg-blue-700 text-white border-b border-blue-800">
-      <div class="px-4 md:px-6 xl:px-8 h-16 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-1">
-            <span class="w-3 h-3 rounded-full bg-white/90 block"></span>
-            <span class="w-3 h-3 rounded-full bg-white/90 block"></span>
-          </div>
-          <div class="w-px h-7 bg-yellow-300/80 mx-1"></div>
-          <h1 class="text-xl font-extrabold tracking-tight">JobTracker</h1>
-        </div>
-
-        <nav class="desktop-nav h-full">
-          <div class="h-full flex items-center">
-            <button class="nav-btn active h-full px-5 border-l border-blue-500/70 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="tracker">
-              <i data-lucide="kanban-square" class="w-4 h-4"></i>
-              Tracker
-            </button>
-            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="jobs">
-              <i data-lucide="list" class="w-4 h-4"></i>
-              Jobs
-            </button>
-            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="profile">
-              <i data-lucide="user-round" class="w-4 h-4"></i>
-              Profile
-            </button>
-            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="docs">
-              <i data-lucide="folder" class="w-4 h-4"></i>
-              Docs
-            </button>
-            <button class="nav-btn h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium" data-section="settings">
-              <i data-lucide="settings" class="w-4 h-4"></i>
-              Settings
-            </button>
-            <button id="logout-btn" class="h-full px-5 border-r border-blue-500/70 inline-flex items-center gap-2 font-medium hover:bg-blue-800">
-              <i data-lucide="log-out" class="w-4 h-4"></i>
-            </button>
-          </div>
-        </nav>
-
-        <button id="mobile-menu-btn" class="mobile-nav inline-flex items-center justify-center rounded-xl p-2 hover:bg-blue-800">
-          <i data-lucide="menu" class="w-5 h-5"></i>
-        </button>
+  <div id="app-shell" class="hidden">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">JobTracker</p>
+        <h1>Personal dashboard</h1>
       </div>
-
-      <div id="mobile-menu" class="mobile-nav hidden border-t border-blue-500/60 bg-blue-700">
-        <div class="px-4 py-3 grid grid-cols-2 gap-2">
-          <button class="nav-btn active rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 bg-blue-800" data-section="tracker">
-            <i data-lucide="kanban-square" class="w-4 h-4"></i> Tracker
-          </button>
-          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="jobs">
-            <i data-lucide="list" class="w-4 h-4"></i> Jobs
-          </button>
-          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="profile">
-            <i data-lucide="user-round" class="w-4 h-4"></i> Profile
-          </button>
-          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="docs">
-            <i data-lucide="folder" class="w-4 h-4"></i> Docs
-          </button>
-          <button class="nav-btn rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800" data-section="settings">
-            <i data-lucide="settings" class="w-4 h-4"></i> Settings
-          </button>
-          <button id="mobile-logout-btn" class="rounded-xl px-4 py-3 text-left inline-flex items-center gap-2 hover:bg-blue-800">
-            <i data-lucide="log-out" class="w-4 h-4"></i> Logout
-          </button>
-        </div>
+      <div class="topbar-actions">
+        <nav class="nav-group">
+          <button class="nav-btn active" data-section="tracker">Tracker</button>
+          <button class="nav-btn" data-section="jobs">Jobs</button>
+          <button class="nav-btn" data-section="profile">Profile</button>
+          <button class="nav-btn" data-section="docs">Docs</button>
+          <button class="nav-btn" data-section="settings">Settings</button>
+        </nav>
+        <button id="logout-btn" class="btn btn-secondary" type="button">Logout</button>
       </div>
     </header>
 
-    <main class="px-4 md:px-6 xl:px-8 py-6">
-      <!-- TRACKER -->
-      <section id="tracker" class="section-panel active space-y-6">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <main class="layout">
+      <section id="tracker" class="section-panel active stack-lg">
+        <div class="section-head">
           <div>
-            <p class="text-sm font-medium text-slate-500">Overview</p>
-            <h2 class="text-3xl font-extrabold tracking-tight">Application Tracker</h2>
+            <p class="eyebrow">Overview</p>
+            <h2>Tracker overview</h2>
           </div>
-
-          <div class="flex flex-wrap gap-3">
-            <button id="open-add-job" class="btn-primary inline-flex items-center gap-2">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              Add Job
-            </button>
-            <button id="refresh-dashboard-btn" class="btn-soft inline-flex items-center gap-2">
-              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-              Refresh
-            </button>
-          </div>
+          <button id="refresh-dashboard-btn" class="btn btn-secondary" type="button">Refresh</button>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <div class="stat-card">
-            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Wishlist</p>
-            <p id="wishlist-count" class="text-3xl font-extrabold mt-2">0</p>
-          </div>
-          <div class="stat-card">
-            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Applied</p>
-            <p id="applied-count" class="text-3xl font-extrabold mt-2">0</p>
-          </div>
-          <div class="stat-card">
-            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Interview</p>
-            <p id="interview-count" class="text-3xl font-extrabold mt-2">0</p>
-          </div>
-          <div class="stat-card">
-            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Offered</p>
-            <p id="offered-count" class="text-3xl font-extrabold mt-2">0</p>
-          </div>
-          <div class="stat-card">
-            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Accepted</p>
-            <p id="accepted-count" class="text-3xl font-extrabold mt-2">0</p>
-          </div>
+        <div class="stats-grid">
+          <article class="panel stat-card"><span>Total</span><strong id="total-count">0</strong></article>
+          <article class="panel stat-card"><span>Wishlist</span><strong id="wishlist-count">0</strong></article>
+          <article class="panel stat-card"><span>Applied</span><strong id="applied-count">0</strong></article>
+          <article class="panel stat-card"><span>Interview</span><strong id="interview-count">0</strong></article>
+          <article class="panel stat-card"><span>Offered</span><strong id="offered-count">0</strong></article>
+          <article class="panel stat-card"><span>Accepted</span><strong id="accepted-count">0</strong></article>
         </div>
 
-        <div class="soft-card p-5">
-          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5">
+        <div class="panel">
+          <div class="section-head compact">
             <div>
-              <h3 class="text-xl font-extrabold">Kanban Board</h3>
-              <p class="text-sm text-slate-500">Track your applications from wishlist to accepted.</p>
+              <p class="eyebrow">Pipeline</p>
+              <h3>Kanban snapshot</h3>
             </div>
-            <p class="text-sm text-slate-500">Drag-and-drop can be added later. For now, jobs can be updated from the Jobs section.</p>
           </div>
+          <div class="board-grid">
+            <div class="board-column"><div class="board-head"><span>Wishlist</span><span id="wishlist-badge" class="badge">0</span></div><div id="wishlist-column" class="board-list"></div></div>
+            <div class="board-column"><div class="board-head"><span>Applied</span><span id="applied-badge" class="badge">0</span></div><div id="applied-column" class="board-list"></div></div>
+            <div class="board-column"><div class="board-head"><span>Interview</span><span id="interview-badge" class="badge">0</span></div><div id="interview-column" class="board-list"></div></div>
+            <div class="board-column"><div class="board-head"><span>Offered</span><span id="offered-badge" class="badge">0</span></div><div id="offered-column" class="board-list"></div></div>
+            <div class="board-column"><div class="board-head"><span>Accepted</span><span id="accepted-badge" class="badge">0</span></div><div id="accepted-column" class="board-list"></div></div>
+          </div>
+        </div>
+      </section>
 
-          <div class="board-scroll">
-            <div class="board-grid">
-              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h4 class="font-extrabold">Wishlist</h4>
-                  <span id="wishlist-badge" class="chip chip-blue">0</span>
-                </div>
-                <div id="wishlist-column" class="space-y-3"></div>
-              </div>
+      <section id="jobs" class="section-panel stack-lg hidden">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Pipeline</p>
+            <h2>Jobs list</h2>
+          </div>
+          <div class="inline-actions">
+            <button id="jobs-refresh-btn" class="btn btn-secondary" type="button">Refresh</button>
+            <button id="open-add-job" class="btn btn-primary" type="button">Add job</button>
+          </div>
+        </div>
+        <div class="panel filters-grid">
+          <input id="jobs-search-input" class="field" type="search" placeholder="Search company, role, notes" />
+          <select id="jobs-status-filter" class="field">
+            <option value="">All statuses</option>
+            <option>Wishlist</option>
+            <option>Applied</option>
+            <option>Interview</option>
+            <option>Offered</option>
+            <option>Accepted</option>
+            <option>Rejected</option>
+            <option>Archived</option>
+          </select>
+        </div>
+        <div id="jobs-list" class="jobs-table"></div>
+      </section>
 
-              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h4 class="font-extrabold">Applied</h4>
-                  <span id="applied-badge" class="chip chip-blue">0</span>
-                </div>
-                <div id="applied-column" class="space-y-3"></div>
+      <section id="profile" class="section-panel stack-lg hidden">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Resume context</p>
+            <h2>Profile and resume</h2>
+          </div>
+          <div class="inline-actions">
+            <button id="analyze-resume-btn" class="btn btn-secondary" type="button">Analyze resume</button>
+            <button id="save-resume-btn" class="btn btn-primary" type="button">Save profile</button>
+          </div>
+        </div>
+        <div class="panel stack-md">
+          <label class="label" for="resume-box">Resume text</label>
+          <textarea id="resume-box" class="field textarea-lg" placeholder="Paste resume text here"></textarea>
+        </div>
+        <div class="two-column">
+          <div class="panel stack-md">
+            <div class="section-head compact"><h3>Parsed profile</h3></div>
+            <pre id="parsed-profile-output" class="code-block">{}</pre>
+          </div>
+          <div class="panel stack-md">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Matching context</p>
+                <h3>Keywords</h3>
               </div>
+              <button id="save-keywords-btn" class="btn btn-secondary" type="button">Save keywords</button>
+            </div>
+            <textarea id="keyword-box" class="field textarea-md" placeholder="One keyword per line"></textarea>
+          </div>
+        </div>
+      </section>
 
-              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h4 class="font-extrabold">Interview</h4>
-                  <span id="interview-badge" class="chip chip-yellow">0</span>
-                </div>
-                <div id="interview-column" class="space-y-3"></div>
+      <section id="docs" class="section-panel stack-lg hidden">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Documents</p>
+            <h2>Docs and recruiter email tools</h2>
+          </div>
+        </div>
+        <div class="two-column">
+          <div class="panel stack-md">
+            <h3>Document uploads</h3>
+            <p class="muted">Frontend file pickers are wired up now so you can choose files locally before a later storage integration.</p>
+            <input id="resume-upload" type="file" class="hidden" accept=".pdf,.doc,.docx,.txt" />
+            <input id="cover-letter-upload" type="file" class="hidden" accept=".pdf,.doc,.docx,.txt" />
+            <button id="resume-upload-btn" class="btn btn-secondary" type="button">Choose resume file</button>
+            <p id="resume-upload-status" class="message">No file selected.</p>
+            <button id="cover-letter-upload-btn" class="btn btn-secondary" type="button">Choose cover letter file</button>
+            <p id="cover-letter-upload-status" class="message">No file selected.</p>
+          </div>
+          <div class="panel stack-md">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Recruiter email</p>
+                <h3>Parse email</h3>
               </div>
-
-              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h4 class="font-extrabold">Offered</h4>
-                  <span id="offered-badge" class="chip chip-green">0</span>
-                </div>
-                <div id="offered-column" class="space-y-3"></div>
-              </div>
-
-              <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h4 class="font-extrabold">Accepted</h4>
-                  <span id="accepted-badge" class="chip chip-green">0</span>
-                </div>
-                <div id="accepted-column" class="space-y-3"></div>
-              </div>
+              <button id="parse-email-btn" class="btn btn-primary" type="button">Parse email</button>
+            </div>
+            <textarea id="email-parser-input" class="field textarea-md" placeholder="Paste recruiter email text here"></textarea>
+            <select id="email-job-link" class="field"><option value="">Optionally link to a job</option></select>
+            <div class="result-card">
+              <p><strong>Status:</strong> <span id="parsed-email-status">-</span></p>
+              <p><strong>Reason:</strong> <span id="parsed-email-reason">-</span></p>
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div class="xl:col-span-2 soft-card p-6">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <h3 class="text-xl font-extrabold">Recent Jobs</h3>
-                <p class="text-sm text-slate-500">Latest entries from your tracked applications.</p>
-              </div>
-            </div>
-            <div id="recent-jobs-list" class="space-y-3">
-              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
-                No jobs added yet.
-              </div>
+      <section id="settings" class="section-panel stack-lg hidden">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Preferences</p>
+            <h2>Settings and assistant</h2>
+          </div>
+          <button id="save-settings-btn" class="btn btn-primary" type="button">Save settings</button>
+        </div>
+        <div class="two-column">
+          <div class="panel stack-md">
+            <label class="label" for="sync-window">Sync window (hours)</label>
+            <input id="sync-window" class="field" type="number" min="1" max="168" />
+            <label class="label" for="preferred-location">Preferred location</label>
+            <input id="preferred-location" class="field" type="text" placeholder="Remote, NYC, Seattle..." />
+            <label class="label" for="user-notes">Notes</label>
+            <textarea id="user-notes" class="field textarea-md" placeholder="Preferences, reminders, search strategy"></textarea>
+            <div class="result-card">
+              <p><strong>Future Gmail sync:</strong> <span id="gmail-sync-status">Not configured</span></p>
             </div>
           </div>
-
-          <div class="soft-card p-6">
-            <div class="flex items-center justify-between mb-4">
+          <div class="panel chat-panel">
+            <div class="section-head compact">
               <div>
-                <h3 class="text-xl font-extrabold">AI Assistant</h3>
-                <p class="text-sm text-slate-500">Ask about your jobs, resume, or progress.</p>
-              </div>
-              <i data-lucide="sparkles" class="w-5 h-5 text-slate-400"></i>
-            </div>
-
-            <div id="chat-messages" class="rounded-2xl bg-slate-50 border border-slate-200 p-4 h-72 overflow-y-auto space-y-3">
-              <div class="rounded-2xl bg-white border border-slate-200 p-3 text-sm text-slate-700">
-                Hi Rugved — ask me something like <span class="font-semibold">“How many jobs have I applied till now?”</span>
+                <p class="eyebrow">Assistant</p>
+                <h3>Chat with saved context</h3>
               </div>
             </div>
-
-            <form id="chat-form" class="mt-4 flex gap-2">
-              <input id="chat-input" type="text" class="field" placeholder="Ask your dashboard AI..." />
-              <button class="btn-primary inline-flex items-center justify-center" type="submit">
-                <i data-lucide="send" class="w-4 h-4"></i>
-              </button>
+            <div id="chat-messages" class="chat-messages"></div>
+            <form id="chat-form" class="chat-form">
+              <input id="chat-input" class="field" type="text" placeholder="Ask about jobs, resume, keywords, or settings" required />
+              <button class="btn btn-primary" type="submit">Send</button>
             </form>
-          </div>
-        </div>
-      </section>
-
-      <!-- JOBS -->
-      <section id="jobs" class="section-panel space-y-6">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h2 class="text-3xl font-extrabold tracking-tight">Jobs</h2>
-            <p class="text-slate-500">Search, filter, and manage all tracked jobs.</p>
-          </div>
-
-          <button id="jobs-add-btn" class="btn-primary inline-flex items-center gap-2">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            Add Job
-          </button>
-        </div>
-
-        <div class="soft-card p-5">
-          <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
-            <input id="jobs-search-input" class="field md:col-span-2" placeholder="Search company or role..." />
-            <select id="jobs-status-filter" class="field">
-              <option value="all">All statuses</option>
-              <option value="Wishlist">Wishlist</option>
-              <option value="Applied">Applied</option>
-              <option value="Interview">Interview</option>
-              <option value="Offered">Offered</option>
-              <option value="Accepted">Accepted</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-            <input id="jobs-company-filter" class="field" placeholder="Filter by company..." />
-            <button id="jobs-refresh-btn" class="btn-soft inline-flex items-center justify-center gap-2">
-              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        <div class="soft-card p-5">
-          <div id="jobs-list" class="space-y-4">
-            <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
-              No tracked jobs yet.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- PROFILE -->
-      <section id="profile" class="section-panel space-y-6">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h2 class="text-3xl font-extrabold tracking-tight">Profile</h2>
-            <p class="text-slate-500">Your resume context, parsed skills, and target profile.</p>
-          </div>
-
-          <button id="analyze-resume-top-btn" class="btn-primary inline-flex items-center gap-2">
-            <i data-lucide="scan-text" class="w-4 h-4"></i>
-            Analyze Resume
-          </button>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div class="soft-card p-6">
-            <h3 class="text-xl font-extrabold mb-2">Resume Text</h3>
-            <p class="text-sm text-slate-500 mb-4">Paste your latest resume so the AI can use it as context.</p>
-
-            <textarea
-              id="resume-box"
-              class="field min-h-[420px] font-mono text-sm"
-              placeholder="Paste your resume text here..."
-            ></textarea>
-
-            <div class="mt-4 flex flex-col sm:flex-row gap-3">
-              <button id="analyze-resume-btn" class="btn-primary">Analyze Resume</button>
-              <button id="save-resume-btn" class="btn-dark">Save Resume</button>
-            </div>
-          </div>
-
-          <div class="soft-card p-6 space-y-6">
-            <div>
-              <h3 class="text-xl font-extrabold mb-2">Parsed Profile</h3>
-              <p class="text-sm text-slate-500">Structured output that your AI uses.</p>
-            </div>
-
-            <pre id="parsed-profile-output" class="rounded-2xl bg-slate-950 text-slate-100 p-5 text-sm overflow-auto min-h-[260px] whitespace-pre-wrap">{
-  "skills": [],
-  "roles": [],
-  "experienceLevel": "",
-  "domains": [],
-  "locations": [],
-  "education": []
-}</pre>
-
-            <div>
-              <label class="block text-sm font-semibold mb-2">Keywords</label>
-              <textarea
-                id="keyword-box"
-                rows="8"
-                class="field"
-                placeholder="Example:
-Data Analyst
-Python
-SQL
-Business Intelligence
-OPT Sponsorship"
-              ></textarea>
-            </div>
-
-            <button id="save-keywords-btn" class="btn-soft">Save Keywords</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- DOCS -->
-      <section id="docs" class="section-panel space-y-6">
-        <div>
-            <h2 class="text-3xl font-extrabold tracking-tight">Documents</h2>
-            <p class="text-slate-400">Cover letters, resume versions, and saved files.</p>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div class="soft-card p-6">
-            <div class="flex items-center justify-between gap-4">
-                <div>
-                <h3 class="text-2xl font-extrabold">Cover Letters</h3>
-                <p class="text-sm text-slate-400 mt-2">Upload or generate cover letters.</p>
-                </div>
-                <div class="flex gap-2">
-                <input id="cover-letter-upload" type="file" class="hidden" />
-                <button id="cover-letter-upload-btn" class="btn-soft">Upload</button>
-                <button class="btn-primary">Generate</button>
-                </div>
-            </div>
-
-            <div id="cover-letter-upload-status" class="mt-6 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-sm text-slate-300">
-                No file uploaded yet.
-            </div>
-            </div>
-
-            <div class="soft-card p-6">
-            <div class="flex items-center justify-between gap-4">
-                <div>
-                <h3 class="text-2xl font-extrabold">CV / Resume</h3>
-                <p class="text-sm text-slate-400 mt-2">Upload and manage resume versions.</p>
-                </div>
-                <div class="flex gap-2">
-                <input id="resume-upload" type="file" class="hidden" />
-                <button id="resume-upload-btn" class="btn-soft">Upload</button>
-                <button class="btn-primary">Generate</button>
-                </div>
-            </div>
-
-            <div id="resume-upload-status" class="mt-6 rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-sm text-slate-300">
-                No file uploaded yet.
-            </div>
-            </div>
-        </div>
-        </section>
-
-      <!-- SETTINGS -->
-      <section id="settings" class="section-panel space-y-6">
-        <div>
-          <h2 class="text-3xl font-extrabold tracking-tight">Settings</h2>
-          <p class="text-slate-500">Personalize your dashboard and AI preferences.</p>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div class="soft-card p-6 space-y-5">
-            <div>
-              <h3 class="text-2xl font-extrabold">System Preferences</h3>
-              <p class="text-sm text-slate-500 mt-2">Control how the AI behaves on your dashboard.</p>
-            </div>
-
-            <div>
-              <label class="block text-sm font-semibold mb-2">Sync window</label>
-              <select id="sync-window" class="field">
-                <option value="24">Jobs posted in last 24 hours</option>
-                <option value="48">Jobs posted in last 48 hours</option>
-                <option value="72">Jobs posted in last 72 hours</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-semibold mb-2">Preferred location</label>
-              <input id="preferred-location" type="text" class="field" placeholder="Hartford, CT / Remote / NYC" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-semibold mb-2">AI notes</label>
-              <textarea id="user-notes" rows="6" class="field" placeholder="Anything the AI should prioritize..."></textarea>
-            </div>
-
-            <button id="save-settings-btn" class="btn-dark">Save Settings</button>
-          </div>
-
-          <div class="soft-card p-6 space-y-5">
-            <div>
-              <h3 class="text-2xl font-extrabold">Recruiter Email Parser</h3>
-              <p class="text-sm text-slate-500 mt-2">Update job status using raw recruiter emails.</p>
-            </div>
-
-            <textarea
-              id="email-parser-input"
-              rows="12"
-              class="field"
-              placeholder="Paste recruiter email text here..."
-            ></textarea>
-
-            <select id="email-job-link" class="field">
-              <option value="">Link parsed status to tracked job</option>
-            </select>
-
-            <button id="parse-email-btn" class="btn-primary">Parse Email</button>
-
-            <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <p class="text-xs uppercase tracking-wide font-bold text-slate-500">Detected Status</p>
-              <p id="parsed-email-status" class="text-2xl font-extrabold mt-2">No signal detected</p>
-              <p id="parsed-email-reason" class="text-sm text-slate-600 mt-3 leading-6">
-                Paste an email and parse it to detect interview, offer, rejection, or other status changes.
-              </p>
-            </div>
           </div>
         </div>
       </section>
     </main>
   </div>
 
-  <!-- ADD JOB MODAL -->
-  <div id="add-job-modal" class="hidden fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm p-4">
-    <div class="min-h-full flex items-center justify-center">
-      <div class="w-full max-w-2xl rounded-[28px] bg-white border border-slate-200 shadow-2xl">
-        <div class="p-6 border-b border-slate-200 flex items-center justify-between">
-          <div>
-            <h3 class="text-2xl font-extrabold">Add Job</h3>
-            <p class="text-sm text-slate-500 mt-1">Add a company and role to your tracker.</p>
-          </div>
-          <button id="close-add-job-modal" class="rounded-xl p-2 hover:bg-slate-100">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
-        </div>
-
-        <form id="add-job-form" class="p-6 space-y-4">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-semibold mb-2">Company</label>
-              <input id="job-company" class="field" placeholder="Amazon" required />
-            </div>
-            <div>
-              <label class="block text-sm font-semibold mb-2">Role</label>
-              <input id="job-role" class="field" placeholder="Data Analyst" required />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-semibold mb-2">Status</label>
-              <select id="job-status" class="field">
-                <option value="Wishlist">Wishlist</option>
-                <option value="Applied">Applied</option>
-                <option value="Interview">Interview</option>
-                <option value="Offered">Offered</option>
-                <option value="Accepted">Accepted</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-semibold mb-2">Date</label>
-              <input id="job-date" type="date" class="field" />
-            </div>
-            <div>
-              <label class="block text-sm font-semibold mb-2">Field</label>
-              <input id="job-field" class="field" placeholder="Tech" />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-semibold mb-2">Salary</label>
-              <input id="job-salary" class="field" placeholder="$80,000 - $100,000" />
-            </div>
-            <div>
-              <label class="block text-sm font-semibold mb-2">Sponsor</label>
-              <input id="job-sponsor" class="field" placeholder="Yes / No / Unknown" />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold mb-2">Link</label>
-            <input id="job-link" type="url" class="field" placeholder="https://..." />
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold mb-2">Notes</label>
-            <textarea id="job-notes" rows="4" class="field" placeholder="Optional notes..."></textarea>
-          </div>
-
-          <div class="flex flex-col sm:flex-row gap-3 pt-2">
-            <button type="submit" class="btn-primary flex-1">Save Job</button>
-            <button type="button" id="cancel-add-job-modal" class="btn-soft flex-1">Cancel</button>
-          </div>
-        </form>
+  <div id="add-job-modal" class="modal hidden">
+    <div class="modal-card panel">
+      <div class="section-head compact">
+        <h3>Add job</h3>
+        <button id="close-add-job-modal" class="btn btn-ghost" type="button">Close</button>
       </div>
+      <form id="add-job-form" class="stack-md">
+        <input name="company" class="field" type="text" placeholder="Company" required />
+        <input name="role" class="field" type="text" placeholder="Role" required />
+        <select name="status" class="field">
+          <option>Wishlist</option>
+          <option selected>Applied</option>
+          <option>Interview</option>
+          <option>Offered</option>
+          <option>Accepted</option>
+          <option>Rejected</option>
+          <option>Archived</option>
+        </select>
+        <input name="date" class="field" type="date" />
+        <input name="field" class="field" type="text" placeholder="Field" />
+        <input name="sponsor" class="field" type="text" placeholder="Sponsorship status" />
+        <input name="salary" class="field" type="text" placeholder="Salary" />
+        <input name="link" class="field" type="url" placeholder="Job link" />
+        <textarea name="notes" class="field textarea-md" placeholder="Notes"></textarea>
+        <div class="inline-actions end">
+          <button id="cancel-add-job-modal" class="btn btn-ghost" type="button">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save job</button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <!-- TOAST -->
-  <div id="toast" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[60] rounded-full bg-slate-900 text-white px-5 py-3 text-sm font-semibold shadow-xl">
-    Saved
-  </div>
-
-  <script src="/script.js"></script>
+  <div id="toast" class="toast hidden"></div>
 </body>
 </html>
