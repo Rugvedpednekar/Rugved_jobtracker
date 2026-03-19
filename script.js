@@ -90,6 +90,37 @@ const acceptedColumn = document.getElementById("accepted-column");
 const recentJobsList = document.getElementById("recent-jobs-list");
 const jobsList = document.getElementById("jobs-list");
 
+const coverLetterUpload = document.getElementById("cover-letter-upload");
+const coverLetterUploadBtn = document.getElementById("cover-letter-upload-btn");
+const coverLetterUploadStatus = document.getElementById("cover-letter-upload-status");
+
+const resumeUpload = document.getElementById("resume-upload");
+const resumeUploadBtn = document.getElementById("resume-upload-btn");
+const resumeUploadStatus = document.getElementById("resume-upload-status");
+
+
+coverLetterUploadBtn?.addEventListener("click", () => {
+  coverLetterUpload?.click();
+});
+
+resumeUploadBtn?.addEventListener("click", () => {
+  resumeUpload?.click();
+});
+
+coverLetterUpload?.addEventListener("change", () => {
+  const file = coverLetterUpload.files?.[0];
+  coverLetterUploadStatus.textContent = file
+    ? `Selected file: ${file.name}`
+    : "No file uploaded yet.";
+});
+
+resumeUpload?.addEventListener("change", () => {
+  const file = resumeUpload.files?.[0];
+  resumeUploadStatus.textContent = file
+    ? `Selected file: ${file.name}`
+    : "No file uploaded yet.";
+});
+
 // --------------------
 // Helpers
 // --------------------
