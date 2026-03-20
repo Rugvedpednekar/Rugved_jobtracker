@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -14,13 +15,18 @@ import requests
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from bs4 import BeautifulSoup
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from docx import Document as DocxDocument
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pypdf import PdfReader
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.pdfgen import canvas
 from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text, create_engine, desc, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -429,6 +435,17 @@ class ResumeSaveRequest(BaseModel):
     parsed_profile: Optional[Dict[str, Any]] = None
 
 
+class DocumentUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    content_text: str
+
+
+class DocumentPdfRequest(BaseModel):
+    title: str = "Document"
+    content_text: str
+    file_name: Optional[str] = None
+
+
 class KeywordsRequest(BaseModel):
     keywords: List[str]
 
@@ -489,6 +506,8 @@ class JobResponse(BaseModel):
     ai_match_score: Optional[int]
     ai_match_summary: str
     metadata_json: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
 
 
 class TaskResponse(BaseModel):
@@ -514,6 +533,8 @@ class DocumentResponse(BaseModel):
     linked_job_id: Optional[str]
     metadata_json: Dict[str, Any]
     is_active: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 class RecommendedJobResponse(BaseModel):
@@ -798,6 +819,12 @@ class DocumentService:
     def list(self) -> List[DocumentRecord]:
         return list(self.db.scalars(select(DocumentRecord).where(DocumentRecord.is_active.is_(True)).order_by(desc(DocumentRecord.updated_at))))
 
+    def get(self, document_id: str) -> DocumentRecord:
+        record = self.db.get(DocumentRecord, document_id)
+        if record is None or not record.is_active:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return record
+
     def upsert_text_document(self, name: str, doc_type: str, content_text: str, linked_job_id: Optional[str] = None, metadata_json: Optional[Dict[str, Any]] = None) -> DocumentRecord:
         stmt = select(DocumentRecord).where(DocumentRecord.doc_type == doc_type, DocumentRecord.linked_job_id == linked_job_id, DocumentRecord.is_active.is_(True))
         record = self.db.scalar(stmt)
@@ -807,6 +834,16 @@ class DocumentService:
         record.content_text = content_text.strip()
         record.name = name
         record.metadata_json = metadata_json or {}
+        record.updated_at = datetime.now(timezone.utc)
+        self.db.commit()
+        self.db.refresh(record)
+        return record
+
+    def update(self, document_id: str, content_text: str, name: Optional[str] = None) -> DocumentRecord:
+        record = self.get(document_id)
+        record.content_text = content_text.strip()
+        if name is not None:
+            record.name = name.strip() or record.name
         record.updated_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(record)
@@ -1402,6 +1439,81 @@ def ai_generate_cover_letter(parsed_job: Dict[str, Any], resume_text: str, parse
         return fallback
 
 
+def extract_resume_text_from_upload(upload: UploadFile) -> Dict[str, str]:
+    filename = upload.filename or "resume"
+    extension = Path(filename).suffix.lower()
+    raw = upload.file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded resume file is empty")
+    if extension in {".txt", ".md", ".rtf"}:
+        text_content = raw.decode("utf-8", errors="ignore")
+        parser = "text"
+    elif extension == ".pdf":
+        reader = PdfReader(io.BytesIO(raw))
+        text_content = "\n\n".join((page.extract_text() or "").strip() for page in reader.pages).strip()
+        parser = "pdf"
+    elif extension == ".docx":
+        document = DocxDocument(io.BytesIO(raw))
+        text_content = "\n".join(paragraph.text for paragraph in document.paragraphs).strip()
+        parser = "docx"
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported resume format. Upload a TXT, PDF, or DOCX file.")
+    if not text_content.strip():
+        raise HTTPException(status_code=400, detail="Could not extract readable text from the uploaded resume.")
+    return {"filename": filename, "text": text_content.strip(), "parser": parser}
+
+
+def build_text_pdf(title: str, content_text: str) -> io.BytesIO:
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    margin = 54
+    max_width = width - (margin * 2)
+    title_font = "Helvetica-Bold"
+    body_font = "Helvetica"
+    title_size = 16
+    body_size = 11
+
+    def wrap_line(text_value: str) -> List[str]:
+        words = text_value.split()
+        if not words:
+            return [""]
+        lines: List[str] = []
+        current = words[0]
+        for word in words[1:]:
+            trial = f"{current} {word}"
+            if stringWidth(trial, body_font, body_size) <= max_width:
+                current = trial
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+        return lines
+
+    y = height - margin
+    pdf.setTitle(title)
+    pdf.setFont(title_font, title_size)
+    pdf.drawString(margin, y, title[:80])
+    y -= 28
+    pdf.setFont(body_font, body_size)
+
+    paragraphs = content_text.splitlines() or [""]
+    for paragraph in paragraphs:
+        wrapped = wrap_line(paragraph) if paragraph.strip() else [""]
+        for line in wrapped:
+            if y <= margin:
+                pdf.showPage()
+                y = height - margin
+                pdf.setFont(body_font, body_size)
+            pdf.drawString(margin, y, line)
+            y -= 16
+        y -= 4
+
+    pdf.save()
+    buffer.seek(0)
+    return buffer
+
+
 def fallback_tasks(parsed_job: Dict[str, Any], action: Optional[str] = None) -> List[Dict[str, Any]]:
     base = [
         {"title": f"Review {parsed_job.get('company', 'company')} job requirements", "details": "Validate skills, location, and seniority before applying.", "status": "open", "task_type": "research"},
@@ -1466,11 +1578,10 @@ def compact_jobs_for_prompt(jobs: List[Dict[str, Any]], limit: int = 60) -> List
 
 def generate_daily_briefing(jobs: List[Dict[str, Any]], tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
     stale = [job for job in jobs if job["status"] == "Applied" and (datetime.now(timezone.utc).date() - date.fromisoformat(str(job["date"]))).days >= 7]
-    open_tasks = [task for task in tasks if task["status"] != "done"]
     return {
-        "summary": f"You have {len(open_tasks)} open tasks and {len(stale)} potentially stale applications.",
+        "summary": f"You have {len(stale)} potentially stale applications and {len(jobs)} tracked jobs in motion.",
         "stale_applications": stale[:5],
-        "focus_today": [task["title"] for task in open_tasks[:3]],
+        "focus_today": [f"Review status for {job['company']} — {job['role']}" for job in stale[:3]],
         "follow_up_suggestions": [f"Check in on {job['company']} for {job['role']}" for job in stale[:3]],
     }
 
@@ -1814,9 +1925,8 @@ def apply_job_action(payload: JobActionRequest, _: Dict[str, Any] = Depends(requ
             metadata_json={"intake_id": intake.id, "source_url": intake.url},
         )
         response["document"] = DocumentResponse.model_validate(document).model_dump(mode="json")
-    created_tasks = TaskService(db).create_many(ai_suggest_tasks(parsed_job, match_analysis, payload.action), linked_job.id if linked_job else None)
     intake_service.set_action(payload.intake_id, payload.action)
-    response["tasks"] = [TaskResponse.model_validate(task).model_dump(mode="json") for task in created_tasks]
+    response["tasks"] = []
     return response
 
 
@@ -1892,14 +2002,13 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: 
     else:
         raise HTTPException(status_code=400, detail="Unsupported recommended job action")
 
-    created_tasks = TaskService(db).create_many(fallback_tasks(parsed_job, "mark_applied" if action == "apply" else None), linked_job.id if linked_job else None)
     return {
         "ok": True,
         "action": action,
         "job": JobResponse.model_validate(linked_job).model_dump(mode="json") if linked_job else None,
         "document": DocumentResponse.model_validate(document).model_dump(mode="json") if document else None,
         "match_analysis": match_analysis,
-        "tasks": [TaskResponse.model_validate(task).model_dump(mode="json") for task in created_tasks],
+        "tasks": [],
     }
 
 
@@ -1918,10 +2027,39 @@ def list_documents(_: Dict[str, Any] = Depends(require_auth), db: Session = Depe
     return [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()]
 
 
+@app.put("/api/documents/{document_id}")
+def update_document(document_id: str, payload: DocumentUpdateRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    document = DocumentService(db).update(document_id, payload.content_text, payload.name)
+    return DocumentResponse.model_validate(document).model_dump(mode="json")
+
+
+@app.post("/api/documents/export-pdf")
+def export_document_pdf(payload: DocumentPdfRequest, _: Dict[str, Any] = Depends(require_auth)):
+    pdf_buffer = build_text_pdf(payload.title.strip() or "Document", payload.content_text)
+    file_name = (payload.file_name or payload.title or "document").strip() or "document"
+    safe_file_name = re.sub(r"[^A-Za-z0-9._-]+", "_", file_name).strip("_") or "document"
+    if not safe_file_name.lower().endswith(".pdf"):
+        safe_file_name = f"{safe_file_name}.pdf"
+    headers = {"Content-Disposition": f'attachment; filename="{safe_file_name}"'}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
+
+
 @app.post("/api/resume/analyze")
 def analyze_resume(req: ResumeAnalyzeRequest, _: Dict[str, Any] = Depends(require_auth)):
     parsed = ai_parse_resume(req.resume_text)
     return {"resume_text": req.resume_text, "parsed_profile": parsed}
+
+
+@app.post("/api/resume/upload")
+def upload_resume(file: UploadFile = File(...), _: Dict[str, Any] = Depends(require_auth)):
+    extracted = extract_resume_text_from_upload(file)
+    parsed = ai_parse_resume(extracted["text"])
+    return {
+        "filename": extracted["filename"],
+        "parser": extracted["parser"],
+        "resume_text": extracted["text"],
+        "parsed_profile": parsed,
+    }
 
 
 @app.post("/api/resume/save")
@@ -1939,11 +2077,14 @@ def save_resume(req: ResumeSaveRequest, _: Dict[str, Any] = Depends(require_auth
 def get_profile(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     try:
         state = StateService(db)
+        documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()]
+        current_resume_document = next((doc for doc in documents if doc["doc_type"] == "resume"), None)
         return {
             "resume_text": state.get("resume_text") or "",
             "parsed_profile": state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
             "chat_history": ChatService(db).tail(limit=12),
-            "documents": [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()],
+            "documents": documents,
+            "current_resume_document": current_resume_document,
         }
     except Exception as exc:
         handle_database_exception("/api/profile", exc)
