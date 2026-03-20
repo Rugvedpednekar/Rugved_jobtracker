@@ -13,6 +13,8 @@ const state = {
   chatHistory: [],
   currentIntake: null,
   parsing: false,
+  parseError: "",
+  chatAvailable: true,
 };
 
 const dom = {
@@ -23,6 +25,7 @@ const dom = {
   loginPassword: document.getElementById("login-password"),
   loginError: document.getElementById("login-error"),
   toast: document.getElementById("toast"),
+  pageTitle: document.getElementById("page-title"),
   navButtons: document.querySelectorAll(".nav-btn"),
   panels: document.querySelectorAll(".section-panel"),
   logoutBtn: document.getElementById("logout-btn"),
@@ -30,6 +33,7 @@ const dom = {
   jobsRefreshBtn: document.getElementById("jobs-refresh-btn"),
   discoverJobsBtn: document.getElementById("discover-jobs-btn"),
   openAddJobBtn: document.getElementById("open-add-job"),
+  openAddJobJobsBtn: document.getElementById("open-add-job-jobs"),
   addJobModal: document.getElementById("add-job-modal"),
   addJobForm: document.getElementById("add-job-form"),
   closeAddJobModal: document.getElementById("close-add-job-modal"),
@@ -40,6 +44,8 @@ const dom = {
   jobUrlInput: document.getElementById("job-url-input"),
   parseJobBtn: document.getElementById("parse-job-btn"),
   parseLoading: document.getElementById("parse-loading"),
+  parseEmpty: document.getElementById("parse-empty"),
+  parseError: document.getElementById("parse-error"),
   parseJobResults: document.getElementById("parse-job-results"),
   parsedCompany: document.getElementById("parsed-company"),
   parsedRole: document.getElementById("parsed-role"),
@@ -118,8 +124,8 @@ function safeText(value, fallback = "—") {
   return value || fallback;
 }
 
-function emptyState(message) {
-  return `<div class="panel empty-state">${message}</div>`;
+function emptyState(title, message = "") {
+  return `<div class="empty-state"><strong>${title}</strong>${message ? `<p>${message}</p>` : ""}</div>`;
 }
 
 function showLogin() {
@@ -135,6 +141,10 @@ function showApp() {
 function setSection(sectionId) {
   dom.panels.forEach(panel => panel.classList.toggle("hidden", panel.id !== sectionId));
   dom.navButtons.forEach(button => button.classList.toggle("active", button.dataset.section === sectionId));
+  if (dom.pageTitle) {
+    const active = Array.from(dom.navButtons).find(button => button.dataset.section === sectionId);
+    dom.pageTitle.textContent = active ? active.textContent.trim() : "Tracker";
+  }
 }
 
 async function safeJSON(response) {
@@ -184,7 +194,9 @@ function renderTrackerCard(job) {
 }
 
 function renderBoardColumn(element, items, label) {
-  element.innerHTML = items.length ? items.map(renderTrackerCard).join("") : emptyState(`No ${label.toLowerCase()} jobs yet.`);
+  element.innerHTML = items.length
+    ? items.map(renderTrackerCard).join("")
+    : emptyState(`No ${label.toLowerCase()} jobs yet`, "This column will populate when a real job reaches this stage.");
 }
 
 function renderDashboard() {
@@ -214,13 +226,13 @@ function renderDashboard() {
   dom.dailyBriefingText.textContent = briefing.summary || "No briefing available yet.";
   dom.followupList.innerHTML = (briefing.follow_up_suggestions || []).length
     ? briefing.follow_up_suggestions.map(item => `<div class="list-item">${item}</div>`).join("")
-    : emptyState("No follow-ups suggested yet.");
+    : emptyState("No follow-ups yet", "Your actual reminders will appear here after activity is recorded.");
   dom.focusList.innerHTML = (briefing.focus_today || []).length
     ? briefing.focus_today.map(item => `<div class="list-item">${item}</div>`).join("")
-    : emptyState("No focus items yet.");
+    : emptyState("No tasks yet", "Create or generate tasks from real jobs to see them here.");
   dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
     ? data.recent_intakes.map(item => `<div class="list-item"><strong>${safeText(item.company)}</strong><p class="muted">${safeText(item.role)} • ${safeText(item.location, "Location pending")}</p></div>`).join("")
-    : emptyState("Parsed jobs will appear here.");
+    : emptyState("No parsed jobs yet", "Parsed job links will appear here after successful intake.");
   if (data.recommended_today) {
     state.recommendedJobs = data.recommended_today;
   }
@@ -260,8 +272,9 @@ function renderRecommendedJobs() {
         <button class="btn btn-secondary" data-recommended-action="generate_cover_letter" type="button">Generate cover letter</button>
       </div>
     </article>
-  `).join("") : emptyState("Recommended jobs will appear here after the morning scan.");
+  `).join("") : emptyState("No recommendations yet", "Run the morning scan or connect data sources to surface real roles.");
 }
+
 
 function filteredJobs() {
   const query = dom.jobsSearchInput.value.trim().toLowerCase();
@@ -277,7 +290,10 @@ function filteredJobs() {
 function renderJobsList() {
   const jobs = filteredJobs();
   if (!jobs.length) {
-    dom.jobsList.innerHTML = emptyState("No jobs match the current filters.");
+    const hasJobs = state.jobs.length > 0;
+    dom.jobsList.innerHTML = hasJobs
+      ? emptyState("No jobs match the current filters", "Try clearing the search or status filter.")
+      : emptyState("No jobs saved yet", "Add a job manually or parse a live job link to start tracking.");
     return;
   }
   dom.jobsList.innerHTML = `
@@ -333,7 +349,7 @@ function renderDocuments() {
         <p>${safeText(doc.content_text.slice(0, 220), "No content")}...</p>
       </div>
     `).join("")
-    : emptyState("Generated resumes and cover letters will appear here.");
+    : emptyState("No saved documents yet", "Generated resumes, cover letters, and drafts will appear here after you create them.");
 }
 
 function renderTasks() {
@@ -355,18 +371,22 @@ function renderTasks() {
         </div>
       </div>
     `).join("")
-    : emptyState("AI-generated tasks will appear here.");
+    : emptyState("No tasks yet", "Tasks created from applications or parsed jobs will appear here.");
 }
 
 function renderChatHistory() {
+  if (!state.chatAvailable) {
+    dom.chatMessages.innerHTML = emptyState("Assistant unavailable", "The chat backend is not connected right now, so the UI will not fake responses or actions.");
+    return;
+  }
   dom.chatMessages.innerHTML = state.chatHistory.length
     ? state.chatHistory.map(item => `
       <div class="chat-bubble ${item.role === "assistant" ? "assistant" : "user"}">
-        <span>${item.role}</span>
+        <div class="chat-bubble-meta">${item.role === "assistant" ? "Assistant" : "You"}</div>
         <p>${item.message}</p>
       </div>
     `).join("")
-    : emptyState("Ask the assistant about jobs, resume data, parsed roles, tasks, or settings.");
+    : emptyState("No conversation yet", "Ask about your jobs, profile, tasks, or documents when the assistant backend is available.");
   dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
 }
 
@@ -376,8 +396,14 @@ function populateEmailJobDropdown() {
 
 function renderParseResults() {
   const intake = state.currentIntake;
+  dom.parseLoading.classList.toggle("hidden", !state.parsing);
+  dom.parseError.classList.toggle("hidden", !state.parseError);
+  dom.parseError.textContent = state.parseError || "";
+  const showEmpty = !state.parsing && !state.parseError && !intake;
+  dom.parseEmpty.classList.toggle("hidden", !showEmpty);
   if (!intake) {
     dom.parseJobResults.classList.add("hidden");
+    dom.generatedOutput.textContent = "Choose an action to generate or save an output.";
     return;
   }
   const parsed = intake.parsed_job || {};
@@ -390,14 +416,15 @@ function renderParseResults() {
   dom.parsedSkills.innerHTML = renderChips(parsed.skills || []);
   dom.parsedSummary.textContent = safeText(parsed.summary);
   dom.parsedMatchSummary.textContent = safeText(match.summary, "No match summary yet.");
-  dom.jobActions.innerHTML = (intake.suggested_actions || []).map(action => `
+  dom.jobActions.innerHTML = (intake.suggested_actions || []).length ? (intake.suggested_actions || []).map(action => `
     <button class="action-card" type="button" data-action-id="${action.id}">
       <strong>${action.label}</strong>
       <p class="muted">${action.description}</p>
     </button>
-  `).join("");
-  dom.generatedOutput.textContent = "Select an action to create AI output.";
+  `).join("") : emptyState("No actions available", "This parse completed, but no follow-up actions were returned by the backend.");
+  dom.generatedOutput.textContent = "Choose an action to generate or save an output.";
 }
+
 
 async function loadDashboard() {
   state.dashboard = await api("/api/dashboard/simple");
@@ -421,6 +448,7 @@ async function loadProfile() {
   dom.resumeBox.value = profile.resume_text || "";
   state.parsedProfile = profile.parsed_profile || {};
   state.chatHistory = profile.chat_history || [];
+  state.chatAvailable = true;
   state.documents = profile.documents || [];
   renderProfile();
   renderChatHistory();
@@ -673,20 +701,33 @@ async function handleEmailParse() {
 
 async function handleChat(event) {
   event.preventDefault();
+  const message = dom.chatInput.value.trim();
+  if (!message) return;
   try {
     const data = await api("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message: dom.chatInput.value })
+      body: JSON.stringify({ message })
     });
+    state.chatAvailable = true;
     state.chatHistory = data.history || [];
     dom.chatInput.value = "";
     renderChatHistory();
   } catch (error) {
+    state.chatAvailable = false;
+    renderChatHistory();
     showToast(error.message);
   }
 }
 
+function resetParseState() {
+  state.currentIntake = null;
+  state.parsing = false;
+  state.parseError = "";
+  renderParseResults();
+}
+
 function openParseModal() {
+  resetParseState();
   dom.parseJobModal.classList.remove("hidden");
   dom.jobUrlInput.focus();
 }
@@ -700,7 +741,10 @@ async function handleParseJob() {
     showToast("Enter a job URL first");
     return;
   }
-  dom.parseLoading.classList.remove("hidden");
+  state.parsing = true;
+  state.parseError = "";
+  state.currentIntake = null;
+  renderParseResults();
   dom.parseJobBtn.disabled = true;
   try {
     const data = await api("/api/jobs/parse-link", {
@@ -708,13 +752,14 @@ async function handleParseJob() {
       body: JSON.stringify({ url: dom.jobUrlInput.value.trim() })
     });
     state.currentIntake = data;
-    renderParseResults();
     showToast("Job parsed");
   } catch (error) {
-    showToast(error.message);
+    state.parseError = error.message || "Unable to parse job link.";
+    showToast(state.parseError);
   } finally {
-    dom.parseLoading.classList.add("hidden");
+    state.parsing = false;
     dom.parseJobBtn.disabled = false;
+    renderParseResults();
   }
 }
 
@@ -752,7 +797,9 @@ function attachEvents() {
   dom.refreshDashboardBtn.addEventListener("click", () => Promise.all([loadDashboard(), loadTasks()]));
   dom.jobsRefreshBtn.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
   dom.discoverJobsBtn.addEventListener("click", handleDiscoverJobs);
-  dom.openAddJobBtn.addEventListener("click", () => dom.addJobModal.classList.remove("hidden"));
+  const openAddJobModal = () => dom.addJobModal.classList.remove("hidden");
+  dom.openAddJobBtn.addEventListener("click", openAddJobModal);
+  dom.openAddJobJobsBtn.addEventListener("click", openAddJobModal);
   dom.closeAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
   dom.cancelAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
   dom.addJobForm.addEventListener("submit", handleAddJob);
@@ -778,6 +825,8 @@ function attachEvents() {
 
 window.addEventListener("DOMContentLoaded", async () => {
   attachEvents();
+  resetParseState();
+  renderChatHistory();
   if (window.lucide) window.lucide.createIcons();
   await checkAuth();
 });
