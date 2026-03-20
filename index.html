@@ -238,6 +238,39 @@
     }
     .table-head { background: var(--color-primary-subtle); color: var(--color-text-muted); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
     .table-row:last-child { border-bottom: none; }
+    .job-primary-button {
+      width: 100%;
+      border: none;
+      background: transparent;
+      padding: 0;
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+      display: grid;
+      gap: 0.2rem;
+    }
+    .job-primary-button strong {
+      color: var(--color-primary-hover);
+      transition: color 0.2s ease;
+    }
+    .job-primary-button:hover strong,
+    .job-primary-button:focus-visible strong {
+      color: var(--color-primary);
+      text-decoration: underline;
+      text-underline-offset: 0.18rem;
+    }
+    .job-primary-button:focus-visible {
+      outline: none;
+      border-radius: var(--radius-sm);
+      box-shadow: 0 0 0 4px var(--color-primary-light);
+    }
+    .job-summary-preview {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      line-height: 1.5;
+    }
     .recommended-card { padding: 1.25rem; }
     .score-badge { color: var(--color-success); background: #ecfdf5; border: 1px solid #bbf7d0; padding: 0.45rem 0.7rem; border-radius: 999px; font-weight: 700; }
     .code-block {
@@ -275,6 +308,51 @@
       z-index: 50;
     }
     .modal-card { width: min(100%, 840px); max-height: calc(100vh - 2rem); overflow: auto; }
+    .job-details-modal-card { width: min(960px, 100%); }
+    .job-details-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+    .job-details-title-group { display: grid; gap: 0.45rem; }
+    .job-details-status-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+    .job-details-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      background: var(--color-primary-subtle);
+      border: 1px solid var(--color-primary-light);
+      color: var(--color-primary-hover);
+      font-weight: 700;
+    }
+    .job-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .job-detail-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      padding: 1rem;
+      min-height: 100%;
+    }
+    .job-detail-card.full-span { grid-column: 1 / -1; }
+    .job-detail-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      margin-bottom: 0.45rem;
+    }
+    .job-detail-value {
+      color: var(--color-text-main);
+      line-height: 1.65;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .job-detail-value.is-fallback { color: var(--color-text-muted); }
+    .job-detail-link {
+      color: var(--color-primary-hover);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .job-detail-link:hover { text-decoration: underline; }
     .toast {
       position: fixed;
       left: 50%;
@@ -297,7 +375,7 @@
     }
     @media (max-width: 760px) {
       .layout, .topbar { padding-left: 1rem; padding-right: 1rem; }
-      .stats-grid, .filters-grid, .two-column, .briefing-lists, .metric-grid, .table-row { grid-template-columns: 1fr; }
+      .stats-grid, .filters-grid, .two-column, .briefing-lists, .metric-grid, .table-row, .job-details-grid { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; flex-direction: column; }
       .table-row { padding: 1rem; }
     }
@@ -748,6 +826,23 @@
           <pre id="generated-output" class="code-block output-block">Choose an action to generate or save an output.</pre>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="job-details-modal" class="modal hidden" aria-hidden="true">
+    <div class="panel modal-card job-details-modal-card stack-md" role="dialog" aria-modal="true" aria-labelledby="job-details-title">
+      <div class="job-details-modal-head">
+        <div class="job-details-title-group">
+          <p class="eyebrow">Application details</p>
+          <h3 id="job-details-title">Job details</h3>
+          <div class="job-details-status-row">
+            <span id="job-details-status" class="job-details-status-badge">Not specified</span>
+            <span id="job-details-match" class="chip">Match not available</span>
+          </div>
+        </div>
+        <button id="close-job-details-modal" class="btn btn-ghost btn-icon-only" type="button" aria-label="Close job details"><i data-lucide="x"></i></button>
+      </div>
+      <div id="job-details-grid" class="job-details-grid"></div>
     </div>
   </div>
 

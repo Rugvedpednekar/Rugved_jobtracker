@@ -56,6 +56,12 @@ const dom = {
   parsedMatchSummary: document.getElementById("parsed-match-summary"),
   jobActions: document.getElementById("job-actions"),
   generatedOutput: document.getElementById("generated-output"),
+  jobDetailsModal: document.getElementById("job-details-modal"),
+  closeJobDetailsModal: document.getElementById("close-job-details-modal"),
+  jobDetailsTitle: document.getElementById("job-details-title"),
+  jobDetailsStatus: document.getElementById("job-details-status"),
+  jobDetailsMatch: document.getElementById("job-details-match"),
+  jobDetailsGrid: document.getElementById("job-details-grid"),
   jobsSearchInput: document.getElementById("jobs-search-input"),
   jobsStatusFilter: document.getElementById("jobs-status-filter"),
   jobsList: document.getElementById("jobs-list"),
@@ -112,6 +118,8 @@ const dom = {
   chatInput: document.getElementById("chat-input")
 };
 
+let lastModalTrigger = null;
+
 function showToast(message) {
   if (!dom.toast) return;
   dom.toast.textContent = message;
@@ -122,6 +130,45 @@ function showToast(message) {
 
 function safeText(value, fallback = "—") {
   return value || fallback;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function formatDateValue(value, fallback = "Not specified") {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+function formatDateTimeValue(value, fallback = "Not specified") {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function renderDetailValue(value, fallback = "Not specified") {
+  const text = value ? escapeHtml(value) : escapeHtml(fallback);
+  return `<div class="job-detail-value${value ? "" : " is-fallback"}">${text}</div>`;
+}
+
+function renderDetailLink(value, fallback = "Not specified") {
+  if (!value) return renderDetailValue("", fallback);
+  const href = escapeHtml(value);
+  return `<div class="job-detail-value"><a class="job-detail-link" href="${href}" target="_blank" rel="noopener noreferrer">${href}</a></div>`;
+}
+
+function renderDetailList(items, fallback = "Not specified") {
+  if (!items?.length) return renderDetailValue("", fallback);
+  return `<div class="chip-row">${items.map(item => `<span class="chip">${escapeHtml(item)}</span>`).join("")}</div>`;
 }
 
 function emptyState(title, message = "") {
@@ -307,8 +354,10 @@ function renderJobsList() {
     ${jobs.map(job => `
       <div class="table-row" data-job-id="${job.id}">
         <div>
-          <strong>${safeText(job.company)}</strong>
-          <p class="muted">${safeText(job.role)}<br>${safeText(job.job_summary, "No summary saved")}</p>
+          <button class="job-primary-button" data-action="open-details" type="button" aria-label="Open details for ${escapeHtml(safeText(job.company, "job"))}">
+            <strong>${safeText(job.company)}</strong>
+            <p class="muted">${safeText(job.role)}<br><span class="job-summary-preview">${safeText(job.job_summary, "No summary saved")}</span></p>
+          </button>
         </div>
         <div>
           <select class="field job-status-select" data-action="status">
@@ -323,6 +372,51 @@ function renderJobsList() {
       </div>
     `).join("")}
   `;
+}
+
+function openJobDetailsModal(job, trigger = null) {
+  if (!job || !dom.jobDetailsModal) return;
+  lastModalTrigger = trigger || document.activeElement;
+  const title = [job.company, job.role].filter(Boolean).join(" — ") || "Job details";
+  dom.jobDetailsTitle.textContent = title;
+  dom.jobDetailsStatus.textContent = safeText(job.status, "Not specified");
+  dom.jobDetailsMatch.textContent = job.ai_match_score ? `Match ${job.ai_match_score}%` : "Match not available";
+  const cards = [
+    ["Company name", renderDetailValue(job.company, "Not specified")],
+    ["Role title", renderDetailValue(job.role, "Not specified")],
+    ["Application status", renderDetailValue(job.status, "Not specified")],
+    ["When I applied", renderDetailValue(formatDateValue(job.date, "Not specified"), "Not specified")],
+    ["Location", renderDetailValue(job.location, "Not specified")],
+    ["Salary", renderDetailValue(job.salary, "Not specified")],
+    ["Sponsorship info", renderDetailValue(job.sponsor || job.sponsorship, "Not specified")],
+    ["Job link", renderDetailLink(job.link, "Not specified")],
+    ["Source", renderDetailValue(job.source, "Not specified")],
+    ["Match score", renderDetailValue(job.ai_match_score ? `${job.ai_match_score}%` : "", "Not specified")],
+    ["Created date", renderDetailValue(formatDateTimeValue(job.created_at, "Not specified"), "Not specified")],
+    ["Updated date", renderDetailValue(formatDateTimeValue(job.updated_at, "Not specified"), "Not specified")],
+    ["Skills", renderDetailList(job.skills, "No skills parsed"), "full-span"],
+    ["Notes", renderDetailValue(job.notes, "No notes added"), "full-span"],
+    ["Summary / parsed description", renderDetailValue(job.job_summary, "Not specified"), "full-span"],
+    ["Match summary", renderDetailValue(job.ai_match_summary, "Not specified"), "full-span"]
+  ];
+  dom.jobDetailsGrid.innerHTML = cards.map(([label, valueHtml, span]) => `
+    <section class="job-detail-card${span ? ` ${span}` : ""}">
+      <div class="job-detail-label">${label}</div>
+      ${valueHtml}
+    </section>
+  `).join("");
+  dom.jobDetailsModal.classList.remove("hidden");
+  dom.jobDetailsModal.setAttribute("aria-hidden", "false");
+  dom.closeJobDetailsModal.focus();
+}
+
+function closeJobDetailsModal() {
+  if (!dom.jobDetailsModal) return;
+  dom.jobDetailsModal.classList.add("hidden");
+  dom.jobDetailsModal.setAttribute("aria-hidden", "true");
+  if (lastModalTrigger && typeof lastModalTrigger.focus === "function") {
+    lastModalTrigger.focus();
+  }
 }
 
 function renderProfile() {
@@ -538,6 +632,11 @@ async function handleAddJob(event) {
 async function handleJobListClick(event) {
   const row = event.target.closest("[data-job-id]");
   if (!row) return;
+  if (event.target.closest('[data-action="open-details"]')) {
+    const job = state.jobs.find(item => item.id === row.dataset.jobId);
+    openJobDetailsModal(job, event.target.closest('[data-action="open-details"]'));
+    return;
+  }
   if (event.target.dataset.action === "delete") {
     try {
       await api(`/api/jobs/${row.dataset.jobId}`, { method: "DELETE" });
@@ -805,6 +904,7 @@ function attachEvents() {
   dom.addJobForm.addEventListener("submit", handleAddJob);
   dom.openParseJobBtns.forEach(button => button && button.addEventListener("click", openParseModal));
   dom.closeParseJobModal.addEventListener("click", closeParseModal);
+  dom.closeJobDetailsModal.addEventListener("click", closeJobDetailsModal);
   dom.parseJobBtn.addEventListener("click", handleParseJob);
   dom.jobActions.addEventListener("click", handleParsedActionClick);
   dom.jobsSearchInput.addEventListener("input", renderJobsList);
@@ -821,6 +921,12 @@ function attachEvents() {
   dom.chatForm.addEventListener("submit", handleChat);
   dom.addJobModal.addEventListener("click", event => { if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden"); });
   dom.parseJobModal.addEventListener("click", event => { if (event.target === dom.parseJobModal) closeParseModal(); });
+  dom.jobDetailsModal.addEventListener("click", event => { if (event.target === dom.jobDetailsModal) closeJobDetailsModal(); });
+  window.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    if (!dom.jobDetailsModal.classList.contains("hidden")) closeJobDetailsModal();
+    if (!dom.parseJobModal.classList.contains("hidden")) closeParseModal();
+  });
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
