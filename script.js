@@ -5,13 +5,16 @@ const TASK_STATUSES = ["open", "in_progress", "done"];
 const state = {
   jobs: [],
   recommendedJobs: [],
-  tasks: [],
   documents: [],
   parsedProfile: {},
   settings: {},
   dashboard: null,
   chatHistory: [],
   currentIntake: null,
+  currentResumeDocument: null,
+  activeDocument: null,
+  activeJobDetails: null,
+  jobDetailsEditMode: false,
   parsing: false,
   parseError: "",
   chatAvailable: true,
@@ -54,6 +57,7 @@ const dom = {
   parsedSkills: document.getElementById("parsed-skills"),
   parsedSummary: document.getElementById("parsed-summary"),
   parsedMatchSummary: document.getElementById("parsed-match-summary"),
+  parsedTailoringNotes: document.getElementById("parsed-tailoring-notes"),
   jobActions: document.getElementById("job-actions"),
   generatedOutput: document.getElementById("generated-output"),
   jobDetailsModal: document.getElementById("job-details-modal"),
@@ -83,7 +87,6 @@ const dom = {
   offeredColumn: document.getElementById("offered-column"),
   acceptedColumn: document.getElementById("accepted-column"),
   laterColumn: document.getElementById("later-column"),
-  tasksList: document.getElementById("tasks-list"),
   documentsList: document.getElementById("documents-list"),
   recentIntakes: document.getElementById("recent-intakes"),
   briefingSummary: document.getElementById("briefing-summary"),
@@ -93,6 +96,12 @@ const dom = {
   followupList: document.getElementById("followup-list"),
   focusList: document.getElementById("focus-list"),
   resumeBox: document.getElementById("resume-box"),
+  resumeMeta: document.getElementById("resume-meta"),
+  resumeUploadStatus: document.getElementById("resume-upload-status"),
+  uploadResumeBtn: document.getElementById("upload-resume-btn"),
+  replaceResumeBtn: document.getElementById("replace-resume-btn"),
+  downloadResumeBtn: document.getElementById("download-resume-btn"),
+  resumeUploadInput: document.getElementById("resume-upload-input"),
   parsedProfileOutput: document.getElementById("parsed-profile-output"),
   analyzeResumeBtn: document.getElementById("analyze-resume-btn"),
   saveResumeBtn: document.getElementById("save-resume-btn"),
@@ -115,7 +124,15 @@ const dom = {
   parseEmailBtn: document.getElementById("parse-email-btn"),
   chatMessages: document.getElementById("chat-messages"),
   chatForm: document.getElementById("chat-form"),
-  chatInput: document.getElementById("chat-input")
+  chatInput: document.getElementById("chat-input"),
+  documentEditorModal: document.getElementById("document-editor-modal"),
+  closeDocumentEditorModal: document.getElementById("close-document-editor-modal"),
+  documentEditorTitle: document.getElementById("document-editor-title"),
+  documentEditorSubtitle: document.getElementById("document-editor-subtitle"),
+  documentEditorName: document.getElementById("document-editor-name"),
+  documentEditorText: document.getElementById("document-editor-text"),
+  saveDocumentBtn: document.getElementById("save-document-btn"),
+  downloadDocumentPdfBtn: document.getElementById("download-document-pdf-btn")
 };
 
 let lastModalTrigger = null;
@@ -276,7 +293,7 @@ function renderDashboard() {
     : emptyState("No follow-ups yet", "Your actual reminders will appear here after activity is recorded.");
   dom.focusList.innerHTML = (briefing.focus_today || []).length
     ? briefing.focus_today.map(item => `<div class="list-item">${item}</div>`).join("")
-    : emptyState("No tasks yet", "Create or generate tasks from real jobs to see them here.");
+    : emptyState("No focus items yet", "Once applications move or become stale, the highest-priority next steps will appear here.");
   dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
     ? data.recent_intakes.map(item => `<div class="list-item"><strong>${safeText(item.company)}</strong><p class="muted">${safeText(item.role)} • ${safeText(item.location, "Location pending")}</p></div>`).join("")
     : emptyState("No parsed jobs yet", "Parsed job links will appear here after successful intake.");
@@ -420,7 +437,8 @@ function closeJobDetailsModal() {
 }
 
 function renderProfile() {
-  dom.parsedProfileOutput.textContent = JSON.stringify(state.parsedProfile || {}, null, 2);
+  renderParsedProfile(state.parsedProfile || {});
+  setResumeMeta({});
 }
 
 function renderSettings() {
@@ -438,34 +456,17 @@ function renderDocuments() {
   dom.documentsList.innerHTML = state.documents.length
     ? state.documents.map(doc => `
       <div class="document-card">
-        <strong>${safeText(doc.name)}</strong>
-        <p>${safeText(doc.doc_type)}</p>
-        <p>${safeText(doc.content_text.slice(0, 220), "No content")}...</p>
+        <div class="document-card-head">
+          <div>
+            <strong>${safeText(doc.name)}</strong>
+            <p class="muted">${safeText(doc.doc_type)} • Updated ${formatDateTimeValue(doc.updated_at, "recently")}</p>
+          </div>
+          <button class="btn btn-secondary" type="button" data-action="open-document" data-document-id="${doc.id}">Open</button>
+        </div>
+        <p class="document-preview">${safeText(doc.content_text.slice(0, 320), "No content")}...</p>
       </div>
     `).join("")
     : emptyState("No saved documents yet", "Generated resumes, cover letters, and drafts will appear here after you create them.");
-}
-
-function renderTasks() {
-  dom.tasksList.innerHTML = state.tasks.length
-    ? state.tasks.map(task => `
-      <div class="task-card" data-task-id="${task.id}">
-        <div class="section-head compact">
-          <div>
-            <strong>${safeText(task.title)}</strong>
-            <p>${safeText(task.details, "No details")}</p>
-          </div>
-          <select class="field task-status-select" data-action="task-status">
-            ${TASK_STATUSES.map(status => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status.replace("_", " ")}</option>`).join("")}
-          </select>
-        </div>
-        <div class="chip-row">
-          <span class="chip">${safeText(task.task_type)}</span>
-          ${task.due_date ? `<span class="chip">Due ${task.due_date}</span>` : ""}
-        </div>
-      </div>
-    `).join("")
-    : emptyState("No tasks yet", "Tasks created from applications or parsed jobs will appear here.");
 }
 
 function renderChatHistory() {
@@ -480,7 +481,7 @@ function renderChatHistory() {
         <p>${item.message}</p>
       </div>
     `).join("")
-    : emptyState("No conversation yet", "Ask about your jobs, profile, tasks, or documents when the assistant backend is available.");
+    : emptyState("No conversation yet", "Ask about your jobs, profile, or documents when the assistant backend is available.");
   dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
 }
 
@@ -510,13 +511,18 @@ function renderParseResults() {
   dom.parsedSkills.innerHTML = renderChips(parsed.skills || []);
   dom.parsedSummary.textContent = safeText(parsed.summary);
   dom.parsedMatchSummary.textContent = safeText(match.summary, "No match summary yet.");
+  const tailoringNotes = match.tailoring_notes || [];
+  dom.parsedTailoringNotes.classList.toggle("hidden", !tailoringNotes.length);
+  dom.parsedTailoringNotes.innerHTML = tailoringNotes.length
+    ? `<p class="label">Tailoring guidance</p><div class="chip-row">${tailoringNotes.map(note => `<span class="chip">${escapeHtml(note)}</span>`).join("")}</div>`
+    : "";
   dom.jobActions.innerHTML = (intake.suggested_actions || []).length ? (intake.suggested_actions || []).map(action => `
     <button class="action-card" type="button" data-action-id="${action.id}">
       <strong>${action.label}</strong>
       <p class="muted">${action.description}</p>
     </button>
   `).join("") : emptyState("No actions available", "This parse completed, but no follow-up actions were returned by the backend.");
-  dom.generatedOutput.textContent = "Choose an action to generate or save an output.";
+  dom.generatedOutput.innerHTML = "Choose an action to generate or save an output.";
 }
 
 
@@ -544,7 +550,9 @@ async function loadProfile() {
   state.chatHistory = profile.chat_history || [];
   state.chatAvailable = true;
   state.documents = profile.documents || [];
+  state.currentResumeDocument = profile.current_resume_document || null;
   renderProfile();
+  setResumeMeta(profile);
   renderChatHistory();
   renderDocuments();
   const keywords = await api("/api/keywords");
@@ -558,18 +566,15 @@ async function loadSettings() {
   renderSettings();
 }
 
-async function loadTasks() {
-  state.tasks = await api("/api/tasks");
-  renderTasks();
-}
-
 async function loadDocuments() {
   state.documents = await api("/api/documents");
+  state.currentResumeDocument = state.documents.find(doc => doc.doc_type === "resume") || state.currentResumeDocument;
   renderDocuments();
+  setResumeMeta({});
 }
 
 async function loadAllData() {
-  await Promise.all([loadDashboard(), loadJobs(), loadRecommendedJobs(), loadProfile(), loadSettings(), loadTasks(), loadDocuments()]);
+  await Promise.all([loadDashboard(), loadJobs(), loadRecommendedJobs(), loadProfile(), loadSettings(), loadDocuments()]);
 }
 
 async function checkAuth() {
@@ -640,7 +645,7 @@ async function handleJobListClick(event) {
   if (event.target.dataset.action === "delete") {
     try {
       await api(`/api/jobs/${row.dataset.jobId}`, { method: "DELETE" });
-      await Promise.all([loadDashboard(), loadJobs(), loadTasks()]);
+      await Promise.all([loadDashboard(), loadJobs()]);
       showToast("Job deleted");
     } catch (error) {
       showToast(error.message);
@@ -663,21 +668,6 @@ async function handleJobListChange(event) {
   }
 }
 
-async function handleTaskListChange(event) {
-  const card = event.target.closest("[data-task-id]");
-  if (!card || event.target.dataset.action !== "task-status") return;
-  try {
-    await api(`/api/tasks/${card.dataset.taskId}`, {
-      method: "PUT",
-      body: JSON.stringify({ status: event.target.value })
-    });
-    await Promise.all([loadTasks(), loadDashboard()]);
-    showToast("Task updated");
-  } catch (error) {
-    showToast(error.message);
-  }
-}
-
 async function handleResumeAnalyze() {
   try {
     const data = await api("/api/resume/analyze", {
@@ -692,6 +682,32 @@ async function handleResumeAnalyze() {
   }
 }
 
+async function handleResumeUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const response = await fetch(`${API_BASE}/api/resume/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: formData
+    });
+    const data = await safeJSON(response);
+    if (!response.ok) throw new Error(data.detail || "Unable to upload resume");
+    dom.resumeBox.value = data.resume_text || "";
+    state.parsedProfile = data.parsed_profile || {};
+    renderProfile();
+    dom.resumeUploadStatus.textContent = `Loaded ${data.filename} using ${data.parser.toUpperCase()} extraction. Review and save when ready.`;
+    showToast("Resume uploaded");
+  } catch (error) {
+    dom.resumeUploadStatus.textContent = error.message;
+    showToast(error.message);
+  } finally {
+    event.target.value = "";
+  }
+}
+
 async function handleResumeSave() {
   try {
     const data = await api("/api/resume/save", {
@@ -700,7 +716,22 @@ async function handleResumeSave() {
     });
     state.parsedProfile = data.parsed_profile || state.parsedProfile;
     await Promise.all([loadProfile(), loadDocuments()]);
-    showToast("Profile saved");
+    dom.resumeUploadStatus.textContent = "Resume saved to your profile workspace.";
+    showToast("Resume saved");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function handleResumeDownload() {
+  const content = dom.resumeBox.value.trim();
+  if (!content) {
+    showToast("Add or upload resume content first");
+    return;
+  }
+  try {
+    await downloadPdf("Primary Resume", content, "primary_resume.pdf");
+    showToast("Resume PDF downloaded");
   } catch (error) {
     showToast(error.message);
   }
@@ -750,7 +781,7 @@ async function handleDiscoverJobs() {
     const data = await api("/api/jobs/discover", { method: "POST" });
     state.recommendedJobs = data.recommended_jobs || [];
     renderRecommendedJobs();
-    await Promise.all([loadDashboard(), loadTasks()]);
+    await Promise.all([loadDashboard()]);
     showToast(`Morning scan finished: ${data.recommended_count || 0} matches`);
   } catch (error) {
     showToast(error.message);
@@ -770,13 +801,14 @@ async function handleRecommendedJobClick(event) {
       body: JSON.stringify({ action: button.dataset.recommendedAction })
     });
     if (data.document?.content_text) {
-      dom.generatedOutput.textContent = data.document.content_text;
       dom.parseJobModal.classList.remove("hidden");
+      dom.generatedOutput.innerHTML = `Generated <strong>${escapeHtml(data.document.name)}</strong>. Review and edit it before exporting.`;
+      openDocumentEditor(data.document, `Tailored for ${card.querySelector("h3")?.textContent || "this role"}.`);
     } else if (data.match_analysis) {
-      dom.generatedOutput.textContent = JSON.stringify(data.match_analysis, null, 2);
+      dom.generatedOutput.innerHTML = `<strong>Match summary</strong><p class="muted">${escapeHtml(data.match_analysis.summary || "Resume comparison ready.")}</p>`;
       dom.parseJobModal.classList.remove("hidden");
     }
-    await Promise.all([loadRecommendedJobs(), loadDashboard(), loadJobs(), loadTasks(), loadDocuments()]);
+    await Promise.all([loadRecommendedJobs(), loadDashboard(), loadJobs(), loadDocuments()]);
     showToast("Recommended job action completed");
   } catch (error) {
     showToast(error.message);
@@ -866,25 +898,101 @@ async function handleParsedActionClick(event) {
   const button = event.target.closest("[data-action-id]");
   if (!button || !state.currentIntake) return;
   const action = button.dataset.actionId;
-  dom.generatedOutput.textContent = "Generating output...";
+  dom.generatedOutput.innerHTML = "Working on your request...";
   try {
     const data = await api("/api/jobs/action", {
       method: "POST",
       body: JSON.stringify({ intake_id: state.currentIntake.intake_id, action })
     });
     if (data.document?.content_text) {
-      dom.generatedOutput.textContent = data.document.content_text;
+      const parsedJob = state.currentIntake?.parsed_job || {};
+      dom.generatedOutput.innerHTML = `Generated <strong>${escapeHtml(data.document.name)}</strong>. Opened editable preview for ${escapeHtml(parsedJob.company || "this job")}.`;
+      openDocumentEditor(data.document, `Tailored for ${parsedJob.role || "the parsed role"} at ${parsedJob.company || "the target company"}.`);
     } else if (data.match_analysis) {
-      dom.generatedOutput.textContent = JSON.stringify(data.match_analysis, null, 2);
+      dom.generatedOutput.innerHTML = `
+        <strong>Resume match updated</strong>
+        <p class="muted">${escapeHtml(data.match_analysis.summary || "Resume comparison generated.")}</p>
+        <div class="chip-row">${(data.match_analysis.matched_skills || []).map(skill => `<span class="chip">${escapeHtml(skill)}</span>`).join("")}</div>
+      `;
     } else if (data.job) {
-      dom.generatedOutput.textContent = `Saved ${data.job.company} — ${data.job.role} as ${data.job.status}.`;
+      dom.generatedOutput.innerHTML = `Saved <strong>${escapeHtml(data.job.company)}</strong> — ${escapeHtml(data.job.role)} as ${escapeHtml(data.job.status)}.`;
     } else {
-      dom.generatedOutput.textContent = "Action saved.";
+      dom.generatedOutput.innerHTML = "Action saved.";
     }
-    await Promise.all([loadDashboard(), loadJobs(), loadTasks(), loadDocuments()]);
+    await Promise.all([loadDashboard(), loadJobs(), loadDocuments()]);
     showToast("Action completed");
   } catch (error) {
     dom.generatedOutput.textContent = error.message;
+    showToast(error.message);
+  }
+}
+
+async function handleJobDetailsSave(event) {
+  event.preventDefault();
+  if (!state.activeJobDetails) return;
+  try {
+    const updatedJob = await api(`/api/jobs/${state.activeJobDetails.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        company: dom.jobDetailsCompany.value.trim(),
+        role: dom.jobDetailsRole.value.trim(),
+        status: dom.jobDetailsStatusSelect.value,
+        date: dom.jobDetailsDate.value || null,
+        location: dom.jobDetailsLocation.value.trim(),
+        salary: dom.jobDetailsSalary.value.trim(),
+        sponsor: dom.jobDetailsSponsor.value.trim(),
+        link: dom.jobDetailsLink.value.trim(),
+        notes: dom.jobDetailsNotes.value.trim(),
+        job_summary: dom.jobDetailsSummary.value.trim(),
+        ai_match_score: dom.jobDetailsMatchScore.value === "" ? null : Number(dom.jobDetailsMatchScore.value)
+      })
+    });
+    state.activeJobDetails = updatedJob;
+    disableJobDetailsEditMode();
+    await Promise.all([loadJobs(), loadDashboard()]);
+    openJobDetailsModal(updatedJob, lastModalTrigger);
+    showToast("Job details updated");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function handleDocumentsClick(event) {
+  const button = event.target.closest('[data-action="open-document"]');
+  if (!button) return;
+  const document = state.documents.find(item => item.id === button.dataset.documentId);
+  openDocumentEditor(document);
+}
+
+async function handleDocumentSave() {
+  if (!state.activeDocument) return;
+  try {
+    const updated = await api(`/api/documents/${state.activeDocument.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: dom.documentEditorName.value.trim(),
+        content_text: dom.documentEditorText.value
+      })
+    });
+    state.activeDocument = updated;
+    await loadDocuments();
+    showToast("Document saved");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function handleDocumentDownload() {
+  const title = dom.documentEditorName.value.trim() || state.activeDocument?.name || "Document";
+  const content = dom.documentEditorText.value.trim();
+  if (!content) {
+    showToast("Document is empty");
+    return;
+  }
+  try {
+    await downloadPdf(title, content, `${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
+    showToast("PDF downloaded");
+  } catch (error) {
     showToast(error.message);
   }
 }
@@ -893,7 +1001,7 @@ function attachEvents() {
   dom.loginForm.addEventListener("submit", handleLogin);
   dom.logoutBtn.addEventListener("click", handleLogout);
   dom.navButtons.forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
-  dom.refreshDashboardBtn.addEventListener("click", () => Promise.all([loadDashboard(), loadTasks()]));
+  dom.refreshDashboardBtn.addEventListener("click", () => Promise.all([loadDashboard()]));
   dom.jobsRefreshBtn.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
   dom.discoverJobsBtn.addEventListener("click", handleDiscoverJobs);
   const openAddJobModal = () => dom.addJobModal.classList.remove("hidden");
@@ -911,14 +1019,21 @@ function attachEvents() {
   dom.jobsStatusFilter.addEventListener("change", renderJobsList);
   dom.jobsList.addEventListener("click", handleJobListClick);
   dom.jobsList.addEventListener("change", handleJobListChange);
-  dom.tasksList.addEventListener("change", handleTaskListChange);
+  dom.documentsList.addEventListener("click", handleDocumentsClick);
   dom.analyzeResumeBtn.addEventListener("click", handleResumeAnalyze);
+  dom.uploadResumeBtn.addEventListener("click", () => dom.resumeUploadInput.click());
+  dom.replaceResumeBtn.addEventListener("click", () => dom.resumeUploadInput.click());
+  dom.resumeUploadInput.addEventListener("change", handleResumeUpload);
   dom.saveResumeBtn.addEventListener("click", handleResumeSave);
+  dom.downloadResumeBtn.addEventListener("click", handleResumeDownload);
   dom.saveKeywordsBtn.addEventListener("click", handleKeywordsSave);
   dom.saveSettingsBtn.addEventListener("click", handleSettingsSave);
   dom.parseEmailBtn.addEventListener("click", handleEmailParse);
   dom.recommendedJobsList.addEventListener("click", handleRecommendedJobClick);
   dom.chatForm.addEventListener("submit", handleChat);
+  dom.closeDocumentEditorModal.addEventListener("click", closeDocumentEditorModal);
+  dom.saveDocumentBtn.addEventListener("click", handleDocumentSave);
+  dom.downloadDocumentPdfBtn.addEventListener("click", handleDocumentDownload);
   dom.addJobModal.addEventListener("click", event => { if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden"); });
   dom.parseJobModal.addEventListener("click", event => { if (event.target === dom.parseJobModal) closeParseModal(); });
   dom.jobDetailsModal.addEventListener("click", event => { if (event.target === dom.jobDetailsModal) closeJobDetailsModal(); });
