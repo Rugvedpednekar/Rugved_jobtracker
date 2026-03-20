@@ -62,25 +62,10 @@ const dom = {
   generatedOutput: document.getElementById("generated-output"),
   jobDetailsModal: document.getElementById("job-details-modal"),
   closeJobDetailsModal: document.getElementById("close-job-details-modal"),
-  editJobDetailsBtn: document.getElementById("edit-job-details-btn"),
   jobDetailsTitle: document.getElementById("job-details-title"),
   jobDetailsStatus: document.getElementById("job-details-status"),
   jobDetailsMatch: document.getElementById("job-details-match"),
   jobDetailsGrid: document.getElementById("job-details-grid"),
-  jobDetailsForm: document.getElementById("job-details-form"),
-  cancelJobDetailsEdit: document.getElementById("cancel-job-details-edit"),
-  jobDetailsCompany: document.getElementById("job-details-company"),
-  jobDetailsRole: document.getElementById("job-details-role"),
-  jobDetailsStatusSelect: document.getElementById("job-details-status-select"),
-  jobDetailsDate: document.getElementById("job-details-date"),
-  jobDetailsLocation: document.getElementById("job-details-location"),
-  jobDetailsSalary: document.getElementById("job-details-salary"),
-  jobDetailsSponsor: document.getElementById("job-details-sponsor"),
-  jobDetailsLink: document.getElementById("job-details-link"),
-  jobDetailsMatchScore: document.getElementById("job-details-match-score"),
-  jobDetailsNotes: document.getElementById("job-details-notes"),
-  jobDetailsSummary: document.getElementById("job-details-summary"),
-  jobDetailsTimestamps: document.getElementById("job-details-timestamps"),
   jobsSearchInput: document.getElementById("jobs-search-input"),
   jobsStatusFilter: document.getElementById("jobs-status-filter"),
   jobsList: document.getElementById("jobs-list"),
@@ -201,54 +186,6 @@ function renderDetailLink(value, fallback = "Not specified") {
 function renderDetailList(items, fallback = "Not specified") {
   if (!items?.length) return renderDetailValue("", fallback);
   return `<div class="chip-row">${items.map(item => `<span class="chip">${escapeHtml(item)}</span>`).join("")}</div>`;
-}
-
-function renderParsedProfile(profile = {}) {
-  const cards = [
-    ["Summary", profile.summary || "Not specified", "full-span"],
-    ["Skills", Array.isArray(profile.skills) ? profile.skills : [], "chips"],
-    ["Target roles", Array.isArray(profile.roles) ? profile.roles : [], "chips"],
-    ["Domains", Array.isArray(profile.domains) ? profile.domains : [], "chips"],
-    ["Locations", Array.isArray(profile.locations) ? profile.locations : [], "chips"],
-    ["Experience level", profile.experienceLevel || "Not specified", ""],
-    ["Education", Array.isArray(profile.education) ? profile.education : [], "chips"]
-  ];
-  dom.parsedProfileOutput.innerHTML = `<div class="parsed-profile-grid">${cards.map(([label, value, type]) => `
-    <section class="parsed-profile-card${type === "full-span" ? " full-span" : ""}">
-      <div class="job-detail-label">${label}</div>
-      ${type === "chips" ? renderDetailList(value, "Not specified") : renderDetailValue(value, "Not specified")}
-    </section>
-  `).join("")}</div>`;
-}
-
-function setResumeMeta(profile) {
-  const source = profile?.current_resume_document?.name || state.currentResumeDocument?.name || "No saved resume yet";
-  const updated = profile?.current_resume_document?.updated_at || state.currentResumeDocument?.updated_at;
-  dom.resumeMeta.textContent = updated
-    ? `${source} • last saved ${formatDateTimeValue(updated)}`
-    : `${source}. Paste text or upload a file to build your working resume.`;
-}
-
-async function downloadPdf(title, contentText, fileName) {
-  const response = await fetch(`${API_BASE}/api/documents/export-pdf`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, content_text: contentText, file_name: fileName })
-  });
-  if (!response.ok) {
-    const data = await safeJSON(response);
-    throw new Error(data.detail || "Unable to export PDF");
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName || `${title}.pdf`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }
 
 function emptyState(title, message = "") {
@@ -456,8 +393,6 @@ function renderJobsList() {
 
 function openJobDetailsModal(job, trigger = null) {
   if (!job || !dom.jobDetailsModal) return;
-  state.activeJobDetails = job;
-  state.jobDetailsEditMode = false;
   lastModalTrigger = trigger || document.activeElement;
   const title = [job.company, job.role].filter(Boolean).join(" — ") || "Job details";
   dom.jobDetailsTitle.textContent = title;
@@ -487,73 +422,15 @@ function openJobDetailsModal(job, trigger = null) {
       ${valueHtml}
     </section>
   `).join("");
-  dom.jobDetailsGrid.classList.remove("hidden");
-  dom.jobDetailsForm.classList.add("hidden");
-  dom.editJobDetailsBtn.classList.remove("hidden");
   dom.jobDetailsModal.classList.remove("hidden");
   dom.jobDetailsModal.setAttribute("aria-hidden", "false");
   dom.closeJobDetailsModal.focus();
 }
 
-function populateJobDetailsForm(job) {
-  dom.jobDetailsCompany.value = job.company || "";
-  dom.jobDetailsRole.value = job.role || "";
-  dom.jobDetailsStatusSelect.innerHTML = STATUS_ORDER.map(status => `<option value="${status}" ${job.status === status ? "selected" : ""}>${status}</option>`).join("");
-  dom.jobDetailsDate.value = job.date || "";
-  dom.jobDetailsLocation.value = job.location || "";
-  dom.jobDetailsSalary.value = job.salary || "";
-  dom.jobDetailsSponsor.value = job.sponsor || "";
-  dom.jobDetailsLink.value = job.link || "";
-  dom.jobDetailsMatchScore.value = job.ai_match_score ?? "";
-  dom.jobDetailsNotes.value = job.notes || "";
-  dom.jobDetailsSummary.value = job.job_summary || "";
-  dom.jobDetailsTimestamps.textContent = `Created ${formatDateTimeValue(job.created_at, "Not specified")} • Updated ${formatDateTimeValue(job.updated_at, "Not specified")}`;
-}
-
-function enableJobDetailsEditMode() {
-  if (!state.activeJobDetails) return;
-  state.jobDetailsEditMode = true;
-  populateJobDetailsForm(state.activeJobDetails);
-  dom.jobDetailsGrid.classList.add("hidden");
-  dom.jobDetailsForm.classList.remove("hidden");
-  dom.editJobDetailsBtn.classList.add("hidden");
-  dom.jobDetailsCompany.focus();
-}
-
-function disableJobDetailsEditMode() {
-  state.jobDetailsEditMode = false;
-  dom.jobDetailsGrid.classList.remove("hidden");
-  dom.jobDetailsForm.classList.add("hidden");
-  dom.editJobDetailsBtn.classList.remove("hidden");
-}
-
 function closeJobDetailsModal() {
   if (!dom.jobDetailsModal) return;
-  disableJobDetailsEditMode();
   dom.jobDetailsModal.classList.add("hidden");
   dom.jobDetailsModal.setAttribute("aria-hidden", "true");
-  if (lastModalTrigger && typeof lastModalTrigger.focus === "function") {
-    lastModalTrigger.focus();
-  }
-}
-
-function openDocumentEditor(doc, subtitle = "") {
-  if (!doc) return;
-  state.activeDocument = { ...doc };
-  lastModalTrigger = document.activeElement;
-  dom.documentEditorTitle.textContent = doc.name || "Document preview";
-  dom.documentEditorSubtitle.textContent = subtitle || "Review and refine this generated draft before exporting it.";
-  dom.documentEditorName.value = doc.name || "";
-  dom.documentEditorText.value = doc.content_text || "";
-  dom.documentEditorModal.classList.remove("hidden");
-  dom.documentEditorModal.setAttribute("aria-hidden", "false");
-  dom.documentEditorText.focus();
-}
-
-function closeDocumentEditorModal() {
-  dom.documentEditorModal.classList.add("hidden");
-  dom.documentEditorModal.setAttribute("aria-hidden", "true");
-  state.activeDocument = null;
   if (lastModalTrigger && typeof lastModalTrigger.focus === "function") {
     lastModalTrigger.focus();
   }
@@ -1136,9 +1013,6 @@ function attachEvents() {
   dom.openParseJobBtns.forEach(button => button && button.addEventListener("click", openParseModal));
   dom.closeParseJobModal.addEventListener("click", closeParseModal);
   dom.closeJobDetailsModal.addEventListener("click", closeJobDetailsModal);
-  dom.editJobDetailsBtn.addEventListener("click", enableJobDetailsEditMode);
-  dom.cancelJobDetailsEdit.addEventListener("click", disableJobDetailsEditMode);
-  dom.jobDetailsForm.addEventListener("submit", handleJobDetailsSave);
   dom.parseJobBtn.addEventListener("click", handleParseJob);
   dom.jobActions.addEventListener("click", handleParsedActionClick);
   dom.jobsSearchInput.addEventListener("input", renderJobsList);
@@ -1163,10 +1037,8 @@ function attachEvents() {
   dom.addJobModal.addEventListener("click", event => { if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden"); });
   dom.parseJobModal.addEventListener("click", event => { if (event.target === dom.parseJobModal) closeParseModal(); });
   dom.jobDetailsModal.addEventListener("click", event => { if (event.target === dom.jobDetailsModal) closeJobDetailsModal(); });
-  dom.documentEditorModal.addEventListener("click", event => { if (event.target === dom.documentEditorModal) closeDocumentEditorModal(); });
   window.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
-    if (!dom.documentEditorModal.classList.contains("hidden")) closeDocumentEditorModal();
     if (!dom.jobDetailsModal.classList.contains("hidden")) closeJobDetailsModal();
     if (!dom.parseJobModal.classList.contains("hidden")) closeParseModal();
   });

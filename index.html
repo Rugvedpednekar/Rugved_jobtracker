@@ -353,35 +353,6 @@
       text-decoration: none;
     }
     .job-detail-link:hover { text-decoration: underline; }
-    .document-card { display: grid; gap: 0.75rem; }
-    .document-card-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-    }
-    .document-preview {
-      color: var(--color-text-muted);
-      line-height: 1.6;
-      white-space: pre-wrap;
-      display: -webkit-box;
-      -webkit-line-clamp: 4;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .parsed-profile-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.75rem;
-    }
-    .parsed-profile-card {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      background: white;
-      padding: 0.9rem 1rem;
-    }
-    .parsed-profile-card.full-span { grid-column: 1 / -1; }
-    .resume-toolbar-note { font-size: 0.82rem; color: var(--color-text-muted); }
     .toast {
       position: fixed;
       left: 50%;
@@ -404,7 +375,7 @@
     }
     @media (max-width: 760px) {
       .layout, .topbar { padding-left: 1rem; padding-right: 1rem; }
-      .stats-grid, .filters-grid, .two-column, .briefing-lists, .metric-grid, .table-row, .job-details-grid, .parsed-profile-grid { grid-template-columns: 1fr; }
+      .stats-grid, .filters-grid, .two-column, .briefing-lists, .metric-grid, .table-row, .job-details-grid { grid-template-columns: 1fr; }
       .topbar { align-items: flex-start; flex-direction: column; }
       .table-row { padding: 1rem; }
     }
@@ -969,6 +940,23 @@
         <button id="save-document-btn" class="btn btn-secondary" type="button"><i data-lucide="save"></i> Save changes</button>
         <button id="download-document-pdf-btn" class="btn btn-primary" type="button"><i data-lucide="file-down"></i> Download PDF</button>
       </div>
+    </div>
+  </div>
+
+  <div id="job-details-modal" class="modal hidden" aria-hidden="true">
+    <div class="panel modal-card job-details-modal-card stack-md" role="dialog" aria-modal="true" aria-labelledby="job-details-title">
+      <div class="job-details-modal-head">
+        <div class="job-details-title-group">
+          <p class="eyebrow">Application details</p>
+          <h3 id="job-details-title">Job details</h3>
+          <div class="job-details-status-row">
+            <span id="job-details-status" class="job-details-status-badge">Not specified</span>
+            <span id="job-details-match" class="chip">Match not available</span>
+          </div>
+        </div>
+        <button id="close-job-details-modal" class="btn btn-ghost btn-icon-only" type="button" aria-label="Close job details"><i data-lucide="x"></i></button>
+      </div>
+      <div id="job-details-grid" class="job-details-grid"></div>
     </div>
   </div>
 
