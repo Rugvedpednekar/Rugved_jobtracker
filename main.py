@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import uuid
@@ -20,7 +21,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
-from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text, create_engine, desc, select
+from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text, create_engine, desc, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 APP_TITLE = "JobTracker Personal Career Assistant"
@@ -113,6 +114,123 @@ COOKIE_NAME = "jobtracker_token"
 IS_PRODUCTION = APP_ENV == "production"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
+logger = logging.getLogger("jobtracker")
+if not logger.handlers:
+    logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+
+REQUIRED_COLUMNS = {
+    "jobs": {
+        "id": "VARCHAR(32) PRIMARY KEY",
+        "company": "VARCHAR(255) DEFAULT ''",
+        "role": "VARCHAR(255) DEFAULT ''",
+        "status": "VARCHAR(32) DEFAULT 'Applied'",
+        "date": "DATE",
+        "field": "VARCHAR(120) DEFAULT ''",
+        "sponsor": "VARCHAR(120) DEFAULT ''",
+        "notes": "TEXT DEFAULT ''",
+        "link": "TEXT DEFAULT ''",
+        "salary": "VARCHAR(120) DEFAULT ''",
+        "location": "VARCHAR(255) DEFAULT ''",
+        "job_summary": "TEXT DEFAULT ''",
+        "skills": "JSON",
+        "source": "VARCHAR(64) DEFAULT 'manual'",
+        "intake_id": "VARCHAR(32)",
+        "ai_match_score": "INTEGER",
+        "ai_match_summary": "TEXT DEFAULT ''",
+        "metadata_json": "JSON",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+        "updated_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "app_state": {
+        "key": "VARCHAR(64) PRIMARY KEY",
+        "value": "JSON",
+        "updated_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "documents": {
+        "id": "VARCHAR(32) PRIMARY KEY",
+        "name": "VARCHAR(255) DEFAULT ''",
+        "doc_type": "VARCHAR(64) DEFAULT 'other'",
+        "content_text": "TEXT DEFAULT ''",
+        "linked_job_id": "VARCHAR(32)",
+        "metadata_json": "JSON",
+        "is_active": "BOOLEAN DEFAULT TRUE",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+        "updated_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "tasks": {
+        "id": "VARCHAR(32) PRIMARY KEY",
+        "title": "VARCHAR(255) DEFAULT ''",
+        "details": "TEXT DEFAULT ''",
+        "status": "VARCHAR(32) DEFAULT 'open'",
+        "task_type": "VARCHAR(64) DEFAULT 'other'",
+        "linked_job_id": "VARCHAR(32)",
+        "due_date": "DATE",
+        "metadata_json": "JSON",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+        "updated_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "chat_history": {
+        "id": "INTEGER",
+        "role": "VARCHAR(16)",
+        "message": "TEXT",
+        "context_type": "VARCHAR(64) DEFAULT 'general'",
+        "linked_job_id": "VARCHAR(32)",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "job_intakes": {
+        "id": "VARCHAR(32) PRIMARY KEY",
+        "url": "TEXT DEFAULT ''",
+        "source_host": "VARCHAR(255) DEFAULT ''",
+        "raw_html": "TEXT DEFAULT ''",
+        "raw_text": "TEXT DEFAULT ''",
+        "parse_status": "VARCHAR(32) DEFAULT 'parsed'",
+        "parsed_job": "JSON",
+        "suggested_actions": "JSON",
+        "selected_action": "VARCHAR(64) DEFAULT ''",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+        "updated_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "recommended_jobs": {
+        "id": "VARCHAR(32) PRIMARY KEY",
+        "run_id": "VARCHAR(32)",
+        "source": "VARCHAR(64) DEFAULT 'scout'",
+        "source_job_id": "VARCHAR(255) DEFAULT ''",
+        "company": "VARCHAR(255) DEFAULT ''",
+        "role": "VARCHAR(255) DEFAULT ''",
+        "location": "VARCHAR(255) DEFAULT ''",
+        "job_type": "VARCHAR(64) DEFAULT ''",
+        "salary": "VARCHAR(120) DEFAULT ''",
+        "link": "TEXT DEFAULT ''",
+        "summary": "TEXT DEFAULT ''",
+        "posted_at": "TIMESTAMP WITH TIME ZONE",
+        "skills": "JSON",
+        "sponsorship": "VARCHAR(120) DEFAULT ''",
+        "domain": "VARCHAR(120) DEFAULT ''",
+        "score": "INTEGER DEFAULT 0",
+        "score_breakdown": "JSON",
+        "match_reasons": "JSON",
+        "missing_points": "JSON",
+        "job_metadata": "JSON",
+        "status": "VARCHAR(32) DEFAULT 'recommended'",
+        "is_active": "BOOLEAN DEFAULT TRUE",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+        "updated_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "job_search_runs": {
+        "id": "VARCHAR(32) PRIMARY KEY",
+        "trigger_mode": "VARCHAR(32) DEFAULT 'manual'",
+        "status": "VARCHAR(32) DEFAULT 'started'",
+        "source_count": "INTEGER DEFAULT 0",
+        "discovered_count": "INTEGER DEFAULT 0",
+        "recommended_count": "INTEGER DEFAULT 0",
+        "rejected_count": "INTEGER DEFAULT 0",
+        "minimum_score": "INTEGER DEFAULT 72",
+        "query_context": "JSON",
+        "error_message": "TEXT DEFAULT ''",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+        "updated_at": "TIMESTAMP WITH TIME ZONE",
+    },
+}
 
 
 class Base(DeclarativeBase):
@@ -476,6 +594,50 @@ def init_engine() -> None:
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
+def deep_copy_default(value: Any) -> Any:
+    return json.loads(json.dumps(value))
+
+
+def safe_json_value(value: Any, fallback: Any) -> Any:
+    if value is None:
+        return deep_copy_default(fallback)
+    if isinstance(fallback, dict):
+        return value if isinstance(value, dict) else deep_copy_default(fallback)
+    if isinstance(fallback, list):
+        return value if isinstance(value, list) else deep_copy_default(fallback)
+    return value
+
+
+def ensure_schema_compatibility() -> None:
+    inspector = inspect(engine)
+    dialect = engine.dialect.name
+    with engine.begin() as connection:
+        for table_name, columns in REQUIRED_COLUMNS.items():
+            if not inspector.has_table(table_name):
+                continue
+            existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, column_sql in columns.items():
+                if column_name in existing_columns:
+                    continue
+                statement = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}"
+                if dialect == "postgresql":
+                    statement = f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_sql}"
+                logger.warning("Adding missing column %s.%s during startup schema reconciliation", table_name, column_name)
+                connection.execute(text(statement))
+
+
+def serialize_job(job: JobRecord) -> Dict[str, Any]:
+    payload = JobResponse.model_validate(job).model_dump(mode="json")
+    payload["skills"] = safe_json_value(payload.get("skills"), [])
+    payload["metadata_json"] = safe_json_value(payload.get("metadata_json"), {})
+    return payload
+
+
+def handle_database_exception(route_name: str, exc: Exception) -> None:
+    logger.exception("Database error in %s: %s", route_name, exc)
+    raise HTTPException(status_code=500, detail=f"{route_name} failed because of a database error. Check Railway logs for details.") from exc
+
+
 def normalize_status(status: str) -> str:
     return STATUS_MAP.get((status or "").strip().lower(), status.strip().title() if status else "Applied")
 
@@ -525,23 +687,25 @@ class StateService:
     def get(self, key: str) -> Any:
         record = self.db.get(AppStateRecord, key)
         if record:
-            return record.value
+            return safe_json_value(record.value, STATE_DEFAULTS.get(key))
         default = STATE_DEFAULTS.get(key)
-        return json.loads(json.dumps(default)) if default is not None else None
+        return deep_copy_default(default) if default is not None else None
 
     def set(self, key: str, value: Any) -> None:
+        default = STATE_DEFAULTS.get(key)
+        stored_value = safe_json_value(value, default) if default is not None else value
         record = self.db.get(AppStateRecord, key)
         if record is None:
-            self.db.add(AppStateRecord(key=key, value=value))
+            self.db.add(AppStateRecord(key=key, value=stored_value))
         else:
-            record.value = value
+            record.value = stored_value
             record.updated_at = datetime.now(timezone.utc)
 
     def ensure_defaults(self) -> None:
         changed = False
         for key, value in STATE_DEFAULTS.items():
             if self.db.get(AppStateRecord, key) is None:
-                self.db.add(AppStateRecord(key=key, value=json.loads(json.dumps(value))))
+                self.db.add(AppStateRecord(key=key, value=deep_copy_default(value)))
                 changed = True
         if changed:
             self.db.commit()
@@ -1313,9 +1477,9 @@ def generate_daily_briefing(jobs: List[Dict[str, Any]], tasks: List[Dict[str, An
 
 def load_context(db: Session) -> Dict[str, Any]:
     state = StateService(db)
-    jobs = [JobResponse.model_validate(job).model_dump(mode="json") for job in JobService(db).list()]
+    jobs = [serialize_job(job) for job in JobService(db).list()]
     tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
-    parsed_jobs = [item.parsed_job for item in IntakeService(db).recent(limit=6)]
+    parsed_jobs = [safe_json_value(item.parsed_job, {}) for item in IntakeService(db).recent(limit=6)]
     documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()][:6]
     recommended_jobs = [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db).list_active(limit=8)]
     return {
@@ -1379,6 +1543,7 @@ def ai_chat(message: str, context: Dict[str, Any]) -> str:
 def initialize_database() -> None:
     init_engine()
     Base.metadata.create_all(bind=engine)
+    ensure_schema_compatibility()
     with SessionLocal() as db:
         StateService(db).ensure_defaults()
 
@@ -1504,29 +1669,35 @@ def auth_me(user: Dict[str, Any] = Depends(require_auth)):
 
 @app.get("/api/dashboard/simple")
 def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    jobs = [JobResponse.model_validate(job).model_dump(mode="json") for job in JobService(db).list()]
-    tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
-    stats = compute_job_stats(jobs)
-    columns = {status: [] for status in ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Later"]}
-    for job in jobs:
-        if job["status"] in columns:
-            columns[job["status"]].append(job)
-    return {
-        "stats": stats,
-        "columns": columns,
-        "recent_jobs": jobs[:8],
-        "recommended_today": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db).list_active(limit=6)],
-        "recent_intakes": [item.parsed_job for item in IntakeService(db).recent(limit=4)],
-        "profile_summary": StateService(db).get("parsed_profile") or DEFAULT_PARSED_PROFILE,
-        "keywords": StateService(db).get("keywords") or [],
-        "daily_briefing": generate_daily_briefing(jobs, tasks),
-        "gmail_sync": gmail_sync_service.get_status(),
-    }
+    try:
+        jobs = [serialize_job(job) for job in JobService(db).list()]
+        tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
+        stats = compute_job_stats(jobs)
+        columns = {status: [] for status in ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Later"]}
+        for job in jobs:
+            if job["status"] in columns:
+                columns[job["status"]].append(job)
+        return {
+            "stats": stats,
+            "columns": columns,
+            "recent_jobs": jobs[:8],
+            "recommended_today": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db).list_active(limit=6)],
+            "recent_intakes": [safe_json_value(item.parsed_job, {}) for item in IntakeService(db).recent(limit=4)],
+            "profile_summary": StateService(db).get("parsed_profile") or DEFAULT_PARSED_PROFILE,
+            "keywords": StateService(db).get("keywords") or [],
+            "daily_briefing": generate_daily_briefing(jobs, tasks),
+            "gmail_sync": gmail_sync_service.get_status(),
+        }
+    except Exception as exc:
+        handle_database_exception("/api/dashboard/simple", exc)
 
 
 @app.get("/api/jobs")
 def get_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return [JobResponse.model_validate(job).model_dump(mode="json") for job in JobService(db).list()]
+    try:
+        return [serialize_job(job) for job in JobService(db).list()]
+    except Exception as exc:
+        handle_database_exception("/api/jobs", exc)
 
 
 @app.post("/api/jobs/discover")
@@ -1766,13 +1937,16 @@ def save_resume(req: ResumeSaveRequest, _: Dict[str, Any] = Depends(require_auth
 
 @app.get("/api/profile")
 def get_profile(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    state = StateService(db)
-    return {
-        "resume_text": state.get("resume_text") or "",
-        "parsed_profile": state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
-        "chat_history": ChatService(db).tail(limit=12),
-        "documents": [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()],
-    }
+    try:
+        state = StateService(db)
+        return {
+            "resume_text": state.get("resume_text") or "",
+            "parsed_profile": state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
+            "chat_history": ChatService(db).tail(limit=12),
+            "documents": [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()],
+        }
+    except Exception as exc:
+        handle_database_exception("/api/profile", exc)
 
 
 @app.get("/api/keywords")
