@@ -3,13 +3,955 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CareerOS Assistant</title>
+  <title>Rugved Job Tracker</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css" />
-  <script defer src="https://unpkg.com/lucide@latest"></script>
-  <script defer src="/script.js"></script>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --color-primary: #2563eb;
+      --color-primary-hover: #1d4ed8;
+      --color-primary-light: #dbeafe;
+      --color-primary-subtle: #eff6ff;
+
+      --color-bg-app: #f8fbff;
+      --color-bg-panel: #ffffff;
+      --color-bg-column: #f8fafc;
+
+      --color-text-main: #0f172a;
+      --color-text-muted: #64748b;
+
+      --color-border: #dbe7f5;
+      --color-border-light: #edf4fb;
+
+      --color-success: #10b981;
+      --color-danger: #ef4444;
+      --color-warning: #f59e0b;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 22px;
+      --radius-full: 9999px;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 8px 20px rgba(37, 99, 235, 0.08);
+      --shadow-lg: 0 20px 40px rgba(37, 99, 235, 0.12);
+      --shadow-glow: 0 0 22px rgba(37, 99, 235, 0.14);
+
+      --font-family: "Inter", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background: var(--color-bg-app);
+      color: var(--color-text-main);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, h4 {
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--color-text-main);
+    }
+
+    h1 { font-size: 1.875rem; }
+    h2 { font-size: 1.5rem; }
+    h3 { font-size: 1.125rem; }
+
+    .muted, p.muted {
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--color-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .hidden { display: none !important; }
+    .stack-md { display: flex; flex-direction: column; gap: 1rem; }
+    .stack-lg { display: flex; flex-direction: column; gap: 1.5rem; }
+    .full-width { width: 100%; }
+    .inline-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .inline-actions.end { justify-content: flex-end; }
+    .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    .panel {
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .panel.inset-panel {
+      background: var(--color-bg-app);
+      border: 1px solid var(--color-border-light);
+      box-shadow: none;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      font-family: inherit;
+    }
+
+    .btn-icon-only {
+      padding: 0.5rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+      color: white;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-secondary {
+      background: var(--color-primary-subtle);
+      color: var(--color-primary-hover);
+      border: 1px solid var(--color-primary-light);
+    }
+
+    .btn-secondary:hover {
+      background: var(--color-primary-light);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--color-text-muted);
+    }
+
+    .btn-ghost:hover {
+      background: #f1f5f9;
+      color: var(--color-text-main);
+    }
+
+    .label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-text-main);
+      margin-bottom: 0.25rem;
+    }
+
+    .field {
+      width: 100%;
+      padding: 0.625rem 1rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.875rem;
+      color: var(--color-text-main);
+      transition: all 0.2s ease;
+      background: #fff;
+    }
+
+    .field:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-primary-light);
+    }
+
+    textarea.field { resize: vertical; }
+    .textarea-md { min-height: 100px; }
+    .textarea-xl { min-height: 250px; }
+
+    .screen-login {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.10), transparent 30%),
+        linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
+      padding: 2rem;
+    }
+
+    .login-shell {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .login-card {
+      box-shadow: var(--shadow-lg), var(--shadow-glow);
+      border: 1px solid var(--color-border);
+      padding: 2.5rem;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .brand-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+      color: white;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand-icon.small {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 0;
+    }
+
+    .hero-points {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .hero-pill {
+      background: var(--color-primary-subtle);
+      color: var(--color-primary-hover);
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid var(--color-primary-light);
+    }
+
+    #app-shell {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 260px;
+      min-width: 260px;
+      border-radius: 0;
+      border-top: none;
+      border-bottom: none;
+      border-left: none;
+      border-right: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 1.5rem;
+      background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+      z-index: 20;
+      transition: margin-left 0.3s ease-in-out, transform 0.3s ease-in-out;
+    }
+
+    .sidebar.collapsed {
+      margin-left: -260px;
+    }
+
+    .nav-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-top: 2rem;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--color-text-muted);
+      font-weight: 500;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .nav-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke-width: 2.2;
+    }
+
+    .nav-btn:hover {
+      background: var(--color-primary-subtle);
+      color: var(--color-primary-hover);
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(135deg, var(--color-primary-subtle), #ffffff);
+      color: var(--color-primary);
+      font-weight: 600;
+      border: 1px solid var(--color-primary-light);
+    }
+
+    .user-profile-widget {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 0;
+      border-top: 1px solid var(--color-border);
+      margin-top: 1rem;
+    }
+
+    .avatar-img {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background-color: var(--color-primary-light);
+      border: 2px solid white;
+      object-fit: cover;
+    }
+
+    .user-info h4 { font-size: 0.875rem; margin-bottom: 0.1rem; }
+    .user-info p { font-size: 0.75rem; color: var(--color-text-muted); }
+
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2.5rem;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--color-border);
+      gap: 1.5rem;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .notification-wrapper {
+      position: relative;
+    }
+
+    .notification-bell {
+      position: relative;
+      background: white;
+      border: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+    }
+
+    .notification-bell:hover {
+      color: var(--color-primary);
+    }
+
+    .notification-dot {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 10px;
+      height: 10px;
+      background-color: var(--color-danger);
+      border-radius: var(--radius-full);
+      border: 2px solid white;
+    }
+
+    .notification-dropdown {
+      position: absolute;
+      top: calc(100% + 0.5rem);
+      right: 0;
+      width: 320px;
+      background: white;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--color-border);
+      z-index: 50;
+      display: none;
+      flex-direction: column;
+    }
+
+    .notification-dropdown.active {
+      display: flex;
+    }
+
+    .notif-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--color-border);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .notif-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .notif-item {
+      padding: 1rem;
+      border-bottom: 1px solid var(--color-border-light);
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .notif-item:hover {
+      background: var(--color-primary-subtle);
+    }
+
+    .notif-item .icon {
+      color: var(--color-primary);
+      margin-top: 0.15rem;
+    }
+
+    .notif-content p { font-size: 0.85rem; color: var(--color-text-main); margin-bottom: 0.25rem; }
+    .notif-content span { font-size: 0.75rem; color: var(--color-text-muted); }
+
+    .topbar-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: white;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-full);
+      font-size: 0.875rem;
+      font-weight: 500;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--color-border);
+    }
+
+    .topbar-chip svg { width: 16px; height: 16px; color: var(--color-primary); }
+
+    .layout {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2.5rem;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 1rem;
+    }
+
+    .section-head.compact { margin-bottom: 0; align-items: center; }
+
+    .hero-card {
+      background: linear-gradient(135deg, #ffffff 0%, #f4f9ff 100%);
+      border-color: var(--color-primary-light);
+    }
+
+    .hero-copy {
+      font-size: 1.1rem;
+      color: var(--color-text-main);
+    }
+
+    .briefing-lists {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .list-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: white;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      font-size: 0.875rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      text-align: center;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    }
+
+    .stat-card span {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-card strong {
+      font-size: 2rem;
+      color: var(--color-primary);
+      margin-top: 0.25rem;
+    }
+
+    .tracker-grid {
+      display: grid;
+      grid-template-columns: 3fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .board-grid {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      padding: 1rem 0;
+      min-height: 400px;
+    }
+
+    .board-column {
+      flex: 0 0 280px;
+      background: var(--color-bg-column);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--color-border);
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    .board-column.drag-over {
+      background: var(--color-primary-light);
+      border: 1px dashed var(--color-primary);
+    }
+
+    .board-head {
+      padding: 1rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge {
+      background: var(--color-border);
+      color: var(--color-text-muted);
+      padding: 0.15rem 0.5rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+    }
+
+    .board-list {
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 150px;
+    }
+
+    .job-card {
+      background: white;
+      padding: 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-sm);
+      cursor: grab;
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    }
+
+    .job-card:active {
+      cursor: grabbing;
+    }
+
+    .job-card.dragging {
+      opacity: 0.5;
+      transform: scale(0.95);
+    }
+
+    .job-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--color-primary-light);
+    }
+
+    .job-card h4 { margin-bottom: 0.25rem; font-size: 0.95rem; }
+    .job-card p { font-size: 0.8rem; color: var(--color-text-muted); }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: 1fr 200px;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .jobs-table {
+      background: white;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+      overflow: hidden;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 2fr 2fr 1.5fr 1fr;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--color-border);
+      align-items: center;
+      font-size: 0.875rem;
+    }
+
+    .table-row.header {
+      background: var(--color-primary-subtle);
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+
+    .chatbot-fab {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+      color: white;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-lg);
+      cursor: pointer;
+      z-index: 100;
+      transition: all 0.2s;
+    }
+
+    .chatbot-fab:hover {
+      transform: scale(1.05);
+    }
+
+    .chatbot-window {
+      position: fixed;
+      bottom: 5.5rem;
+      right: 2rem;
+      width: 350px;
+      max-width: 90vw;
+      background: white;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg), var(--shadow-glow);
+      border: 1px solid var(--color-border);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: opacity 0.3s, transform 0.3s;
+      transform-origin: bottom right;
+    }
+
+    .chatbot-window.hidden {
+      opacity: 0;
+      transform: scale(0.9);
+      pointer-events: none;
+    }
+
+    .chat-header {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+      color: white;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .chat-body {
+      padding: 1rem;
+      height: 300px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: #f8fbff;
+    }
+
+    .chat-msg {
+      max-width: 85%;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      line-height: 1.4;
+    }
+
+    .chat-msg.ai {
+      background: white;
+      align-self: flex-start;
+      border: 1px solid var(--color-border);
+      border-bottom-left-radius: 4px;
+    }
+
+    .chat-msg.user {
+      background: var(--color-primary-subtle);
+      color: var(--color-primary-hover);
+      align-self: flex-end;
+      border: 1px solid var(--color-primary-light);
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-footer {
+      padding: 1rem;
+      border-top: 1px solid var(--color-border);
+      background: white;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      outline: none;
+      font-family: inherit;
+    }
+
+    .chat-send-btn {
+      background: var(--color-primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-full);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .code-block {
+      background: #eff6ff;
+      color: var(--color-text-main);
+      padding: 1rem;
+      border-radius: var(--radius-sm);
+      font-family: monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      border: 1px solid var(--color-border);
+    }
+
+    .code-block.output-block {
+      background: var(--color-bg-column);
+      color: var(--color-text-main);
+      border: 1px solid var(--color-border);
+    }
+
+    .profile-grid, .docs-grid, .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .metric-card {
+      background: white;
+      padding: 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+    }
+
+    .metric-card span {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      display: block;
+    }
+
+    .metric-card strong {
+      font-size: 1rem;
+      color: var(--color-text-main);
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .chip {
+      background: var(--color-primary-subtle);
+      color: var(--color-primary-hover);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 500;
+      border: 1px solid var(--color-primary-light);
+    }
+
+    .result-card {
+      background: #f8fbff;
+      padding: 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--color-border);
+      font-size: 0.875rem;
+    }
+
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.28);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 1rem;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: modalSlide 0.3s ease-out forwards;
+    }
+
+    .modal-card.modal-wide { max-width: 800px; }
+
+    @keyframes modalSlide {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-text-main);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-lg);
+      font-size: 0.875rem;
+      font-weight: 500;
+      z-index: 300;
+      transition: opacity 0.3s;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    @media (max-width: 1200px) {
+      .hero-grid,
+      .tracker-grid,
+      .profile-grid,
+      .docs-grid,
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .sidebar {
+        position: absolute;
+        height: 100%;
+      }
+
+      .layout {
+        padding: 1.25rem;
+      }
+
+      .topbar {
+        padding: 1rem 1.25rem;
+      }
+
+      .briefing-lists,
+      .two-column,
+      .metric-grid,
+      .filters-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .table-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+      }
+    }
+  </style>
 </head>
 <body>
   <section id="login-screen" class="screen screen-login">
@@ -18,57 +960,102 @@
         <div class="brand-row">
           <div class="brand-icon"><i data-lucide="sparkles"></i></div>
           <div>
-            <p class="eyebrow">CareerOS</p>
-            <h1>AI career assistant</h1>
-            <p class="muted">FastAPI + Railway + Postgres + Bedrock</p>
+            <p class="eyebrow">Rugved Tracker</p>
+            <h1>Personal Job Assistant</h1>
+            <p class="muted">Powered by AI to land your next role</p>
           </div>
         </div>
         <div class="hero-points">
           <div class="hero-pill">Parse job links instantly</div>
           <div class="hero-pill">Tailor resumes with AI</div>
-          <div class="hero-pill">Stay on top of follow-ups</div>
+          <div class="hero-pill">Manage applications</div>
         </div>
         <form id="login-form" class="stack-md">
-          <label class="label" for="login-email">Email</label>
-          <input id="login-email" class="field" type="email" placeholder="you@example.com" required />
-          <label class="label" for="login-password">Password</label>
-          <input id="login-password" class="field" type="password" placeholder="Enter password" required />
-          <button class="btn btn-primary" type="submit">Sign in</button>
+          <div>
+            <label class="label" for="login-email">Email</label>
+            <input id="login-email" class="field" type="email" placeholder="rugved@example.com" required />
+          </div>
+          <div>
+            <label class="label" for="login-password">Password</label>
+            <input id="login-password" class="field" type="password" placeholder="Enter your password" required />
+          </div>
+          <button class="btn btn-primary" style="margin-top: 0.5rem;" type="submit">Access Dashboard</button>
         </form>
-        <p id="login-error" class="message error hidden"></p>
       </div>
     </div>
   </section>
 
   <div id="app-shell" class="hidden">
-    <aside class="sidebar panel">
+    <aside class="sidebar" id="sidebar">
       <div>
-        <div class="brand-row brand-row-sidebar">
+        <div class="brand-row">
           <div class="brand-icon small"><i data-lucide="briefcase-business"></i></div>
           <div>
-            <p class="eyebrow">CareerOS</p>
-            <h2>Personal assistant</h2>
+            <p class="eyebrow">Rugved Tracker</p>
+            <h2 style="font-size: 1.125rem;">Command Center</h2>
           </div>
         </div>
         <nav class="nav-stack">
           <button class="nav-btn active" data-section="tracker"><i data-lucide="layout-dashboard"></i><span>Tracker</span></button>
-          <button class="nav-btn" data-section="jobs"><i data-lucide="briefcase"></i><span>Jobs</span></button>
-          <button class="nav-btn" data-section="profile"><i data-lucide="user-round"></i><span>Profile</span></button>
-          <button class="nav-btn" data-section="docs"><i data-lucide="files"></i><span>Docs</span></button>
+          <button class="nav-btn" data-section="jobs"><i data-lucide="briefcase"></i><span>Jobs Pipeline</span></button>
+          <button class="nav-btn" data-section="profile"><i data-lucide="user-round"></i><span>My Profile</span></button>
+          <button class="nav-btn" data-section="docs"><i data-lucide="files"></i><span>Documents</span></button>
           <button class="nav-btn" data-section="settings"><i data-lucide="sliders-horizontal"></i><span>Settings</span></button>
         </nav>
       </div>
-      <button id="logout-btn" class="btn btn-secondary full-width" type="button">Logout</button>
+
+      <div>
+        <div class="user-profile-widget">
+          <img src="https://ui-avatars.com/api/?name=Rugved&background=dbeafe&color=2563eb" alt="Avatar" class="avatar-img" />
+          <div class="user-info">
+            <h4>Rugved</h4>
+            <p>Pro Member</p>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-ghost full-width" style="justify-content: flex-start; margin-top: 0.5rem;" type="button">
+          <i data-lucide="log-out"></i> Logout
+        </button>
+      </div>
     </aside>
 
     <div class="app-main">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">AI-heavy job tracker</p>
-          <h1>Career command center</h1>
+        <div class="topbar-left">
+          <button id="hamburger-btn" class="btn btn-ghost btn-icon-only"><i data-lucide="menu"></i></button>
+          <div>
+            <p class="eyebrow">Overview</p>
+            <h1 id="page-title">Tracker</h1>
+          </div>
         </div>
+
         <div class="topbar-actions">
-          <div class="topbar-chip"><i data-lucide="calendar-days"></i><span id="briefing-summary">Loading briefing...</span></div>
+          <div class="topbar-chip"><i data-lucide="calendar-days"></i><span id="briefing-summary">Today's Focus: 2 Follow-ups</span></div>
+
+          <div class="notification-wrapper">
+            <button id="notif-btn" class="btn btn-ghost btn-icon-only notification-bell">
+              <i data-lucide="bell"></i>
+              <div class="notification-dot"></div>
+            </button>
+            <div id="notif-dropdown" class="notification-dropdown">
+              <div class="notif-header">Notifications</div>
+              <div class="notif-list">
+                <div class="notif-item">
+                  <div class="icon"><i data-lucide="calendar" style="width: 18px;"></i></div>
+                  <div class="notif-content">
+                    <p>Interview with <strong>Google</strong></p>
+                    <span>Tomorrow at 10:00 AM</span>
+                  </div>
+                </div>
+                <div class="notif-item">
+                  <div class="icon"><i data-lucide="mail" style="width: 18px;"></i></div>
+                  <div class="notif-content">
+                    <p>Follow up with <strong>Stripe</strong></p>
+                    <span>It's been 3 days since application</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -79,19 +1066,23 @@
               <div class="section-head compact">
                 <div>
                   <p class="eyebrow">Daily briefing</p>
-                  <h2>Focus for today</h2>
+                  <h2>Good morning, Rugved.</h2>
                 </div>
-                <button id="refresh-dashboard-btn" class="btn btn-secondary" type="button">Refresh</button>
+                <button class="btn btn-secondary btn-refresh" type="button"><i data-lucide="refresh-cw"></i></button>
               </div>
-              <p id="daily-briefing-text" class="hero-copy">Loading...</p>
+              <p class="hero-copy">You have 2 pending interviews this week. A great time to review your tailored resumes and prepare your pitch.</p>
               <div class="briefing-lists">
                 <div>
                   <p class="label">Suggested follow-ups</p>
-                  <div id="followup-list" class="list-stack"></div>
+                  <div class="list-stack">
+                    <div class="list-item"><i data-lucide="mail" style="color: var(--color-primary); width: 16px;"></i> Follow up with Google HR</div>
+                  </div>
                 </div>
                 <div>
                   <p class="label">Top tasks</p>
-                  <div id="focus-list" class="list-stack"></div>
+                  <div class="list-stack">
+                    <div class="list-item"><i data-lucide="check-circle-2" style="color: var(--color-success); width: 16px;"></i> Submit Stripe assignment</div>
+                  </div>
                 </div>
               </div>
             </article>
@@ -99,117 +1090,128 @@
               <div class="section-head compact">
                 <div>
                   <p class="eyebrow">Smart intake</p>
-                  <h3>Paste a job link</h3>
+                  <h3>Found a role?</h3>
                 </div>
-                <button id="open-parse-job" class="btn btn-primary" type="button">Paste Job Link</button>
               </div>
-              <p class="muted">Parse a live job page, structure the role, compare it to your resume, and trigger the next best action.</p>
-              <div id="recent-intakes" class="list-stack"></div>
+              <p class="muted" style="margin-bottom: auto;">Parse a live job page, structure the role, and compare it to your resume instantly.</p>
+              <button class="btn btn-primary full-width open-parse-modal-btn" type="button"><i data-lucide="wand-2"></i> Parse Job Link</button>
             </article>
           </div>
 
           <div class="stats-grid">
-            <article class="panel stat-card"><span>Total</span><strong id="total-count">0</strong></article>
-            <article class="panel stat-card"><span>Wishlist</span><strong id="wishlist-count">0</strong></article>
-            <article class="panel stat-card"><span>Applied</span><strong id="applied-count">0</strong></article>
-            <article class="panel stat-card"><span>Interview</span><strong id="interview-count">0</strong></article>
-            <article class="panel stat-card"><span>Offered</span><strong id="offered-count">0</strong></article>
-            <article class="panel stat-card"><span>Accepted</span><strong id="accepted-count">0</strong></article>
+            <article class="panel stat-card"><span>Total</span><strong id="total-count">12</strong></article>
+            <article class="panel stat-card"><span>Wishlist</span><strong id="wishlist-count">4</strong></article>
+            <article class="panel stat-card"><span>Applied</span><strong id="applied-count">5</strong></article>
+            <article class="panel stat-card"><span>Interview</span><strong id="interview-count">2</strong></article>
+            <article class="panel stat-card"><span>Offered</span><strong id="offered-count">1</strong></article>
           </div>
 
           <div class="tracker-grid">
             <div class="panel">
-              <div class="section-head compact"><h3>Pipeline snapshot</h3></div>
+              <div class="section-head compact">
+                <div>
+                  <h3>Pipeline Snapshot</h3>
+                  <p class="muted" style="font-size: 0.75rem; margin-top: 0.2rem;">Drag and drop cards to update status</p>
+                </div>
+                <button class="btn btn-secondary open-add-job-btn" type="button" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;"><i data-lucide="plus"></i> Add Job</button>
+              </div>
               <div class="board-grid">
-                <div class="board-column"><div class="board-head"><span>Wishlist</span><span id="wishlist-badge" class="badge">0</span></div><div id="wishlist-column" class="board-list"></div></div>
-                <div class="board-column"><div class="board-head"><span>Applied</span><span id="applied-badge" class="badge">0</span></div><div id="applied-column" class="board-list"></div></div>
-                <div class="board-column"><div class="board-head"><span>Interview</span><span id="interview-badge" class="badge">0</span></div><div id="interview-column" class="board-list"></div></div>
-                <div class="board-column"><div class="board-head"><span>Offered</span><span id="offered-badge" class="badge">0</span></div><div id="offered-column" class="board-list"></div></div>
-                <div class="board-column"><div class="board-head"><span>Accepted</span><span id="accepted-badge" class="badge">0</span></div><div id="accepted-column" class="board-list"></div></div>
-                <div class="board-column"><div class="board-head"><span>Later</span><span id="later-badge" class="badge">0</span></div><div id="later-column" class="board-list"></div></div>
+                <div class="board-column" data-status="Wishlist">
+                  <div class="board-head"><span>Wishlist</span><span class="badge" id="badge-Wishlist">0</span></div>
+                  <div id="col-wishlist" class="board-list"></div>
+                </div>
+                <div class="board-column" data-status="Applied">
+                  <div class="board-head"><span>Applied</span><span class="badge" id="badge-Applied">0</span></div>
+                  <div id="col-applied" class="board-list"></div>
+                </div>
+                <div class="board-column" data-status="Interview">
+                  <div class="board-head"><span>Interview</span><span class="badge" id="badge-Interview">0</span></div>
+                  <div id="col-interview" class="board-list"></div>
+                </div>
+                <div class="board-column" data-status="Offered">
+                  <div class="board-head"><span>Offered</span><span class="badge" id="badge-Offered">0</span></div>
+                  <div id="col-offered" class="board-list"></div>
+                </div>
               </div>
             </div>
             <div class="panel stack-md">
-              <div class="section-head compact"><h3>AI task queue</h3></div>
-              <div id="tasks-list" class="task-list"></div>
+              <div class="section-head compact"><h3>AI Task Queue</h3></div>
+              <div class="list-stack">
+                <div class="list-item"><i data-lucide="file-text" style="color: var(--color-text-muted); width: 16px;"></i> Generate Cover Letter (Stripe)</div>
+                <div class="list-item"><i data-lucide="file-text" style="color: var(--color-text-muted); width: 16px;"></i> Tailor Resume (Vercel)</div>
+              </div>
             </div>
           </div>
-
-          <article class="panel stack-md">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Morning Job Scout</p>
-                <h2>Recommended Today</h2>
-              </div>
-              <div class="inline-actions">
-                <span class="muted">Only high-score matches are shown.</span>
-                <button id="discover-jobs-btn" class="btn btn-primary" type="button">Run morning scan</button>
-              </div>
-            </div>
-            <div id="recommended-meta" class="muted">Load your best-fit opportunities for today.</div>
-            <div id="recommended-jobs-list" class="recommended-grid"></div>
-          </article>
         </section>
 
         <section id="jobs" class="section-panel stack-lg hidden">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Pipeline</p>
-              <h2>Jobs</h2>
+              <p class="eyebrow">All Applications</p>
+              <h2>Jobs Pipeline</h2>
             </div>
             <div class="inline-actions">
-              <button id="jobs-refresh-btn" class="btn btn-secondary" type="button">Refresh</button>
-              <button id="open-parse-job-jobs" class="btn btn-primary" type="button">Paste Job Link</button>
-              <button id="open-add-job" class="btn btn-secondary" type="button">Add job</button>
+              <button class="btn btn-secondary btn-refresh" type="button"><i data-lucide="refresh-cw"></i></button>
+              <button class="btn btn-secondary open-parse-modal-btn" type="button"><i data-lucide="wand-2"></i> Parse Link</button>
+              <button class="btn btn-primary open-add-job-btn" type="button"><i data-lucide="plus"></i> Add Job</button>
             </div>
           </div>
-          <div class="panel filters-grid">
-            <input id="jobs-search-input" class="field" type="search" placeholder="Search company, role, notes" />
-            <select id="jobs-status-filter" class="field">
+
+          <div class="panel filters-grid" style="padding: 0.75rem;">
+            <input class="field" type="search" placeholder="Search company, role, notes..." />
+            <select class="field">
               <option value="">All statuses</option>
               <option>Wishlist</option>
               <option>Applied</option>
               <option>Interview</option>
               <option>Offered</option>
-              <option>Accepted</option>
-              <option>Rejected</option>
-              <option>Archived</option>
-              <option>Later</option>
             </select>
           </div>
-          <div id="jobs-list" class="jobs-table"></div>
+
+          <div class="jobs-table">
+            <div class="table-row header">
+              <div>Company & Role</div>
+              <div>Location</div>
+              <div>Date</div>
+              <div>Status</div>
+            </div>
+            <div id="jobs-table-body"></div>
+          </div>
         </section>
 
         <section id="profile" class="section-panel stack-lg hidden">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Resume context</p>
-              <h2>Profile and resume</h2>
+              <p class="eyebrow">Context Engine</p>
+              <h2>Profile & Resume Fit</h2>
             </div>
             <div class="inline-actions">
-              <button id="analyze-resume-btn" class="btn btn-secondary" type="button">Analyze resume</button>
-              <button id="save-resume-btn" class="btn btn-primary" type="button">Save profile</button>
+              <button class="btn btn-secondary trigger-toast" data-msg="Analyzing resume structure..." type="button"><i data-lucide="cpu"></i> Analyze Resume</button>
+              <button class="btn btn-primary trigger-toast" data-msg="Profile saved successfully!" type="button"><i data-lucide="save"></i> Save Profile</button>
             </div>
           </div>
           <div class="profile-grid">
             <div class="panel stack-md">
-              <label class="label" for="resume-box">Resume text</label>
-              <textarea id="resume-box" class="field textarea-xl" placeholder="Paste resume text here"></textarea>
+              <label class="label" for="resume-box">Master Resume Text</label>
+              <textarea id="resume-box" class="field textarea-xl" placeholder="Paste your master resume text here. The AI will use this to generate tailored documents."></textarea>
             </div>
             <div class="stack-lg">
               <div class="panel stack-md">
-                <div class="section-head compact"><h3>Parsed profile</h3></div>
-                <pre id="parsed-profile-output" class="code-block">{}</pre>
+                <div class="section-head compact"><h3>Parsed Extraction</h3></div>
+                <pre class="code-block">{
+  "skills": ["JavaScript", "React", "Node.js", "Python"],
+  "experience_years": 4,
+  "top_roles": ["Software Engineer", "Frontend Developer"]
+}</pre>
               </div>
               <div class="panel stack-md">
                 <div class="section-head compact">
                   <div>
-                    <p class="eyebrow">Matching context</p>
-                    <h3>Keywords</h3>
+                    <p class="eyebrow">Targeting</p>
+                    <h3>Core Keywords</h3>
                   </div>
-                  <button id="save-keywords-btn" class="btn btn-secondary" type="button">Save keywords</button>
                 </div>
-                <textarea id="keyword-box" class="field textarea-md" placeholder="One keyword per line"></textarea>
+                <textarea class="field textarea-md" placeholder="e.g. Frontend, React, System Design">Frontend, React, TypeScript, Tailwind CSS, API Design</textarea>
               </div>
             </div>
           </div>
@@ -218,28 +1220,35 @@
         <section id="docs" class="section-panel stack-lg hidden">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Generated assets</p>
-              <h2>Documents and recruiter tools</h2>
+              <p class="eyebrow">Assets</p>
+              <h2>Generated Documents</h2>
             </div>
           </div>
           <div class="docs-grid">
             <div class="panel stack-md">
-              <div class="section-head compact"><h3>Saved documents</h3></div>
-              <div id="documents-list" class="document-list"></div>
+              <div class="section-head compact"><h3>Saved Tailored Resumes</h3></div>
+              <div class="list-stack">
+                <div class="list-item" style="justify-content: space-between;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="file-text"></i> Resume_Stripe_Frontend.pdf</div>
+                  <button class="btn btn-ghost" style="padding: 0.25rem;"><i data-lucide="download"></i></button>
+                </div>
+                <div class="list-item" style="justify-content: space-between;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="file-text"></i> CoverLetter_Vercel.txt</div>
+                  <button class="btn btn-ghost" style="padding: 0.25rem;"><i data-lucide="download"></i></button>
+                </div>
+              </div>
             </div>
             <div class="panel stack-md">
               <div class="section-head compact">
                 <div>
-                  <p class="eyebrow">Recruiter email</p>
-                  <h3>Parse email</h3>
+                  <p class="eyebrow">Recruiter Comms</p>
+                  <h3>Draft Email Response</h3>
                 </div>
-                <button id="parse-email-btn" class="btn btn-primary" type="button">Parse email</button>
+                <button class="btn btn-secondary trigger-toast" data-msg="Drafting response..." type="button">Generate</button>
               </div>
-              <textarea id="email-parser-input" class="field textarea-md" placeholder="Paste recruiter email text here"></textarea>
-              <select id="email-job-link" class="field"><option value="">Optionally link to a job</option></select>
+              <textarea class="field textarea-md" placeholder="Paste recruiter email here to auto-draft a polite, contextual response..."></textarea>
               <div class="result-card">
-                <p><strong>Status:</strong> <span id="parsed-email-status">-</span></p>
-                <p><strong>Reason:</strong> <span id="parsed-email-reason">-</span></p>
+                <p><strong>Status:</strong> Ready to parse</p>
               </div>
             </div>
           </div>
@@ -249,86 +1258,94 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Preferences</p>
-              <h2>Settings and assistant</h2>
+              <h2>Settings & AI Configuration</h2>
             </div>
-            <button id="save-settings-btn" class="btn btn-primary" type="button">Save settings</button>
+            <button class="btn btn-primary trigger-toast" data-msg="Settings updated successfully." type="button"><i data-lucide="save"></i> Save Changes</button>
           </div>
           <div class="settings-grid">
             <div class="panel stack-md">
-              <label class="label" for="sync-window">Sync window (hours)</label>
-              <input id="sync-window" class="field" type="number" min="1" max="168" />
-              <label class="label" for="preferred-location">Preferred location</label>
-              <input id="preferred-location" class="field" type="text" placeholder="Remote, NYC, Seattle..." />
-              <label class="label" for="preferred-locations">Preferred locations list</label>
-              <textarea id="preferred-locations" class="field textarea-md" placeholder="One preferred location per line"></textarea>
-              <label class="label" for="target-roles">Target roles</label>
-              <textarea id="target-roles" class="field textarea-md" placeholder="One target role per line"></textarea>
-              <label class="label" for="minimum-job-match-score">Minimum match score</label>
-              <input id="minimum-job-match-score" class="field" type="number" min="50" max="95" />
-              <label class="checkbox-row" for="sponsorship-required">
-                <input id="sponsorship-required" type="checkbox" />
-                <span>I need jobs that are sponsorship-friendly</span>
+              <div class="section-head compact" style="margin-bottom: 0;"><h3>Job Preferences</h3></div>
+              <div>
+                <label class="label">Target Locations</label>
+                <input class="field" type="text" placeholder="Remote, NYC, San Francisco..." value="Remote, New York" />
+              </div>
+              <div>
+                <label class="label">Minimum Match Score Alert (%)</label>
+                <input class="field" type="number" min="50" max="95" value="75" />
+              </div>
+              <label class="checkbox-row" style="margin-top: 0.5rem;">
+                <input type="checkbox" checked />
+                <span>Highlight jobs mentioning "Sponsorship available"</span>
               </label>
-              <label class="label" for="tone-setting">Assistant tone</label>
-              <input id="tone-setting" class="field" type="text" placeholder="Concise, confident, direct" />
-              <label class="label" for="user-notes">Notes</label>
-              <textarea id="user-notes" class="field textarea-md" placeholder="Preferences, reminders, search strategy"></textarea>
-              <div class="result-card">
-                <p><strong>Future Gmail sync:</strong> <span id="gmail-sync-status">Not configured</span></p>
+              <div>
+                <label class="label" style="margin-top: 1rem;">Assistant Tone</label>
+                <select class="field">
+                  <option>Professional & Direct</option>
+                  <option selected>Encouraging & Helpful</option>
+                  <option>Strictly Factual</option>
+                </select>
               </div>
             </div>
-            <div class="panel chat-panel">
-              <div class="section-head compact">
-                <div>
-                  <p class="eyebrow">Assistant</p>
-                  <h3>Chat with saved context</h3>
-                </div>
+
+            <div class="panel stack-md">
+              <div class="section-head compact" style="margin-bottom: 0;"><h3>Data Management</h3></div>
+              <p class="muted">Export your entire job hunt pipeline offline.</p>
+              <div class="inline-actions" style="margin-top: 0.5rem;">
+                <button id="export-csv-btn" class="btn btn-secondary" type="button"><i data-lucide="file-spreadsheet"></i> Export CSV</button>
+                <button id="export-json-btn" class="btn btn-secondary" type="button"><i data-lucide="braces"></i> Export JSON</button>
               </div>
-              <div id="chat-messages" class="chat-messages"></div>
-              <form id="chat-form" class="chat-form">
-                <input id="chat-input" class="field" type="text" placeholder="Ask about jobs, parsed roles, tasks, resume fit, or settings" required />
-                <button class="btn btn-primary" type="submit">Send</button>
-              </form>
             </div>
           </div>
         </section>
       </main>
     </div>
+
+    <div id="chat-fab" class="chatbot-fab">
+      <i data-lucide="bot"></i>
+    </div>
+
+    <div id="chat-window" class="chatbot-window hidden">
+      <div class="chat-header">
+        <span>Rugved AI Assistant</span>
+        <i data-lucide="x" id="close-chat" style="cursor: pointer; width: 18px;"></i>
+      </div>
+      <div class="chat-body" id="chat-body">
+        <div class="chat-msg ai">Hi Rugved! How can I help with your job hunt today?</div>
+      </div>
+      <form class="chat-footer" id="chat-form">
+        <input type="text" id="chat-input" class="chat-input" placeholder="Ask AI..." required />
+        <button type="submit" class="chat-send-btn"><i data-lucide="send" style="width: 16px;"></i></button>
+      </form>
+    </div>
   </div>
 
   <div id="add-job-modal" class="modal hidden">
     <div class="modal-card panel">
-      <div class="section-head compact">
-        <h3>Add job</h3>
-        <button id="close-add-job-modal" class="btn btn-ghost" type="button">Close</button>
+      <div class="section-head compact" style="margin-bottom: 1.5rem;">
+        <h3>Add New Job</h3>
+        <button class="btn btn-ghost close-modal-btn" type="button"><i data-lucide="x"></i></button>
       </div>
       <form id="add-job-form" class="stack-md">
-        <input name="company" class="field" type="text" placeholder="Company" required />
-        <input name="role" class="field" type="text" placeholder="Role" required />
-        <div class="two-column compact-grid">
-          <select name="status" class="field">
+        <input class="field" type="text" placeholder="Company Name" required />
+        <input class="field" type="text" placeholder="Role Title" required />
+        <div class="two-column">
+          <select class="field">
             <option>Wishlist</option>
             <option selected>Applied</option>
             <option>Interview</option>
             <option>Offered</option>
-            <option>Accepted</option>
-            <option>Rejected</option>
-            <option>Archived</option>
-            <option>Later</option>
           </select>
-          <input name="date" class="field" type="date" />
+          <input class="field" type="date" />
         </div>
-        <div class="two-column compact-grid">
-          <input name="location" class="field" type="text" placeholder="Location" />
-          <input name="salary" class="field" type="text" placeholder="Salary" />
+        <div class="two-column">
+          <input class="field" type="text" placeholder="Location (e.g. Remote)" />
+          <input class="field" type="text" placeholder="Salary Range" />
         </div>
-        <input name="field" class="field" type="text" placeholder="Field" />
-        <input name="link" class="field" type="url" placeholder="Job link" />
-        <textarea name="job_summary" class="field textarea-md" placeholder="Summary"></textarea>
-        <textarea name="notes" class="field textarea-md" placeholder="Notes"></textarea>
-        <div class="inline-actions end">
-          <button id="cancel-add-job-modal" class="btn btn-ghost" type="button">Cancel</button>
-          <button class="btn btn-primary" type="submit">Save job</button>
+        <input class="field" type="url" placeholder="Job Link (URL)" />
+        <textarea class="field textarea-md" placeholder="Personal Notes..."></textarea>
+        <div class="inline-actions end" style="margin-top: 1rem;">
+          <button class="btn btn-ghost close-modal-btn" type="button">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save Job</button>
         </div>
       </form>
     </div>
@@ -336,58 +1353,341 @@
 
   <div id="parse-job-modal" class="modal hidden">
     <div class="modal-card panel modal-wide">
-      <div class="section-head compact">
+      <div class="section-head compact" style="margin-bottom: 1.5rem;">
         <div>
-          <p class="eyebrow">AI intake</p>
-          <h3>Paste job URL</h3>
+          <p class="eyebrow">AI Intake</p>
+          <h3>Parse Job Link</h3>
         </div>
-        <button id="close-parse-job-modal" class="btn btn-ghost" type="button">Close</button>
+        <button class="btn btn-ghost close-modal-btn" type="button"><i data-lucide="x"></i></button>
       </div>
       <div class="stack-md">
         <div class="inline-actions">
-          <input id="job-url-input" class="field" type="url" placeholder="https://company.com/jobs/role" />
-          <button id="parse-job-btn" class="btn btn-primary" type="button">Parse link</button>
+          <input id="job-url-input" class="field" type="url" placeholder="https://company.com/jobs/role-id" />
+          <button id="run-parse-btn" class="btn btn-primary" type="button"><i data-lucide="wand-2"></i> Parse</button>
         </div>
-        <div id="parse-loading" class="message hidden">Parsing job description and generating suggestions...</div>
-        <div id="parse-job-results" class="stack-lg hidden">
-          <div class="parse-results-grid">
-            <div class="panel inset-panel stack-md">
-              <div class="section-head compact"><h3>Parsed job</h3></div>
-              <div class="metric-grid">
-                <div class="metric-card"><span>Company</span><strong id="parsed-company">-</strong></div>
-                <div class="metric-card"><span>Role</span><strong id="parsed-role">-</strong></div>
-                <div class="metric-card"><span>Location</span><strong id="parsed-location">-</strong></div>
-                <div class="metric-card"><span>Match score</span><strong id="parsed-match-score">-</strong></div>
-              </div>
-              <div class="stack-md">
-                <div>
-                  <p class="label">Skills</p>
-                  <div id="parsed-skills" class="chip-row"></div>
-                </div>
-                <div>
-                  <p class="label">Summary</p>
-                  <p id="parsed-summary" class="muted">-</p>
-                </div>
-                <div>
-                  <p class="label">Resume match summary</p>
-                  <p id="parsed-match-summary" class="muted">-</p>
-                </div>
-              </div>
+
+        <div id="parse-loading" class="result-card hidden" style="text-align: center; color: var(--color-primary);">
+          <i data-lucide="loader-2" class="lucide-spin" style="animation: spin 2s linear infinite;"></i>
+          <p style="margin-top: 0.5rem;">AI is analyzing the job description...</p>
+        </div>
+
+        <div id="parse-results" class="stack-lg hidden" style="margin-top: 1rem;">
+          <div class="metric-grid">
+            <div class="metric-card"><span>Detected Company</span><strong>OpenAI</strong></div>
+            <div class="metric-card"><span>Detected Role</span><strong>Frontend Engineer</strong></div>
+            <div class="metric-card"><span>Location</span><strong>San Francisco / Remote</strong></div>
+            <div class="metric-card"><span>Match Score</span><strong style="color: var(--color-success);">88% Great Fit</strong></div>
+          </div>
+          <div>
+            <p class="label">Required Skills Detected</p>
+            <div class="chip-row">
+              <span class="chip">React</span>
+              <span class="chip">TypeScript</span>
+              <span class="chip">Next.js</span>
+              <span class="chip">UI/UX</span>
             </div>
-            <div class="panel inset-panel stack-md">
-              <div class="section-head compact"><h3>Choose next action</h3></div>
-              <div id="job-actions" class="action-grid"></div>
-              <div>
-                <p class="label">Generated output</p>
-                <pre id="generated-output" class="code-block output-block">Select an action to create AI output.</pre>
-              </div>
-            </div>
+          </div>
+          <div class="inline-actions end">
+            <button class="btn btn-secondary trigger-toast close-modal-btn" data-msg="Added to Wishlist!" type="button">Add to Wishlist</button>
+            <button class="btn btn-primary trigger-toast close-modal-btn" data-msg="Drafting tailored resume in background..." type="button">Auto-Tailor Resume</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden">Action completed successfully.</div>
+
+  <style>
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+
+      const loginScreen = document.getElementById('login-screen');
+      const appShell = document.getElementById('app-shell');
+      const loginForm = document.getElementById('login-form');
+      const logoutBtn = document.getElementById('logout-btn');
+      const navBtns = document.querySelectorAll('.nav-btn');
+      const sections = document.querySelectorAll('.section-panel');
+      const pageTitle = document.getElementById('page-title');
+      const toast = document.getElementById('toast');
+
+      const sidebar = document.getElementById('sidebar');
+      const hamburgerBtn = document.getElementById('hamburger-btn');
+
+      const notifBtn = document.getElementById('notif-btn');
+      const notifDropdown = document.getElementById('notif-dropdown');
+
+      const chatFab = document.getElementById('chat-fab');
+      const chatWindow = document.getElementById('chat-window');
+      const closeChat = document.getElementById('close-chat');
+      const chatForm = document.getElementById('chat-form');
+      const chatInput = document.getElementById('chat-input');
+      const chatBody = document.getElementById('chat-body');
+
+      const exportCsvBtn = document.getElementById('export-csv-btn');
+      const exportJsonBtn = document.getElementById('export-json-btn');
+
+      const addJobModal = document.getElementById('add-job-modal');
+      const parseJobModal = document.getElementById('parse-job-modal');
+      const openAddBtns = document.querySelectorAll('.open-add-job-btn');
+      const openParseBtns = document.querySelectorAll('.open-parse-modal-btn');
+      const closeBtns = document.querySelectorAll('.close-modal-btn');
+
+      let mockJobs = [
+        { id: 'job-1', company: 'Stripe', role: 'Frontend Engineer', location: 'Remote', date: 'Oct 24', status: 'Applied' },
+        { id: 'job-2', company: 'Google', role: 'UX Engineer', location: 'New York', date: 'Oct 22', status: 'Interview' },
+        { id: 'job-3', company: 'Vercel', role: 'Design Engineer', location: 'Remote', date: 'Oct 20', status: 'Wishlist' },
+        { id: 'job-4', company: 'Netflix', role: 'Senior UI Developer', location: 'Los Gatos', date: 'Oct 15', status: 'Applied' },
+        { id: 'job-5', company: 'Spotify', role: 'Web Engineer', location: 'Remote', date: 'Oct 10', status: 'Offered' },
+        { id: 'job-6', company: 'Discord', role: 'Product Engineer', location: 'San Francisco', date: 'Oct 25', status: 'Wishlist' }
+      ];
+
+      const showToast = (msg) => {
+        toast.textContent = msg;
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 3000);
+      };
+
+      const updateKanbanBadges = () => {
+        const statuses = ['Wishlist', 'Applied', 'Interview', 'Offered'];
+        statuses.forEach(st => {
+          const col = document.getElementById(`col-${st.toLowerCase()}`);
+          const badge = document.getElementById(`badge-${st}`);
+          if (col && badge) badge.textContent = col.children.length;
+        });
+      };
+
+      const createJobCard = (job) => {
+        const card = document.createElement('div');
+        card.className = 'job-card';
+        card.draggable = true;
+        card.id = job.id;
+        card.innerHTML = `<h4>${job.company}</h4><p>${job.role}</p>`;
+
+        card.addEventListener('dragstart', (e) => {
+          card.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', job.id);
+        });
+
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+        });
+
+        return card;
+      };
+
+      const populateData = () => {
+        document.getElementById('col-wishlist').innerHTML = '';
+        document.getElementById('col-applied').innerHTML = '';
+        document.getElementById('col-interview').innerHTML = '';
+        document.getElementById('col-offered').innerHTML = '';
+
+        const tableBody = document.getElementById('jobs-table-body');
+        tableBody.innerHTML = '';
+
+        mockJobs.forEach(job => {
+          const colId = `col-${job.status.toLowerCase()}`;
+          const col = document.getElementById(colId);
+          if (col) col.appendChild(createJobCard(job));
+
+          const row = document.createElement('div');
+          row.className = 'table-row';
+
+          let statusColor = 'var(--color-text-muted)';
+          if (job.status === 'Applied') statusColor = 'var(--color-primary)';
+          if (job.status === 'Interview') statusColor = '#7c3aed';
+          if (job.status === 'Offered') statusColor = 'var(--color-success)';
+
+          row.innerHTML = `
+            <div><strong>${job.company}</strong><br><span class="muted">${job.role}</span></div>
+            <div class="muted">${job.location}</div>
+            <div class="muted">${job.date}</div>
+            <div><span class="badge" style="background:${statusColor}20; color:${statusColor}; font-weight:600; border:1px solid ${statusColor}40;">${job.status}</span></div>
+          `;
+          tableBody.appendChild(row);
+        });
+
+        updateKanbanBadges();
+      };
+
+      loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        loginScreen.classList.add('hidden');
+        appShell.classList.remove('hidden');
+        populateData();
+        showToast('Welcome back, Rugved!');
+      });
+
+      logoutBtn.addEventListener('click', () => {
+        appShell.classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+      });
+
+      hamburgerBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+      });
+
+      notifBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        notifDropdown.classList.toggle('active');
+      });
+
+      document.addEventListener('click', () => {
+        notifDropdown.classList.remove('active');
+      });
+
+      notifDropdown.addEventListener('click', (e) => e.stopPropagation());
+
+      chatFab.addEventListener('click', () => {
+        chatWindow.classList.toggle('hidden');
+        if (!chatWindow.classList.contains('hidden')) chatInput.focus();
+      });
+
+      closeChat.addEventListener('click', () => chatWindow.classList.add('hidden'));
+
+      chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        const userMsg = document.createElement('div');
+        userMsg.className = 'chat-msg user';
+        userMsg.textContent = text;
+        chatBody.appendChild(userMsg);
+        chatInput.value = '';
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        setTimeout(() => {
+          const aiMsg = document.createElement('div');
+          aiMsg.className = 'chat-msg ai';
+          aiMsg.textContent = "I've noted that! I can adjust your resume templates or set a reminder for that.";
+          chatBody.appendChild(aiMsg);
+          chatBody.scrollTop = chatBody.scrollHeight;
+        }, 800);
+      });
+
+      const boardColumns = document.querySelectorAll('.board-column');
+      boardColumns.forEach(column => {
+        const list = column.querySelector('.board-list');
+        const status = column.getAttribute('data-status');
+
+        list.addEventListener('dragover', e => {
+          e.preventDefault();
+          column.classList.add('drag-over');
+        });
+
+        list.addEventListener('dragleave', () => {
+          column.classList.remove('drag-over');
+        });
+
+        list.addEventListener('drop', e => {
+          e.preventDefault();
+          column.classList.remove('drag-over');
+
+          const jobId = e.dataTransfer.getData('text/plain');
+          const card = document.getElementById(jobId);
+
+          if (card) {
+            list.appendChild(card);
+            const jobObj = mockJobs.find(j => j.id === jobId);
+            if (jobObj) {
+              jobObj.status = status;
+              showToast(`Moved to ${status}`);
+            }
+            updateKanbanBadges();
+          }
+        });
+      });
+
+      const downloadBlob = (data, filename, type) => {
+        const blob = new Blob([data], { type });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      };
+
+      exportJsonBtn.addEventListener('click', () => {
+        const jsonData = JSON.stringify(mockJobs, null, 2);
+        downloadBlob(jsonData, 'rugved_jobs_pipeline.json', 'application/json');
+        showToast('JSON Export Downloaded!');
+      });
+
+      exportCsvBtn.addEventListener('click', () => {
+        if (mockJobs.length === 0) return;
+        const headers = Object.keys(mockJobs[0]).join(',');
+        const rows = mockJobs.map(job => Object.values(job).map(v => `"${v}"`).join(',')).join('\n');
+        const csvData = headers + '\n' + rows;
+        downloadBlob(csvData, 'rugved_jobs_pipeline.csv', 'text/csv');
+        showToast('CSV Export Downloaded!');
+      });
+
+      navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          navBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          pageTitle.textContent = btn.querySelector('span').textContent;
+
+          const targetId = btn.getAttribute('data-section');
+          sections.forEach(sec => sec.classList.add('hidden'));
+          document.getElementById(targetId).classList.remove('hidden');
+        });
+      });
+
+      openAddBtns.forEach(btn => btn.addEventListener('click', () => addJobModal.classList.remove('hidden')));
+      openParseBtns.forEach(btn => btn.addEventListener('click', () => parseJobModal.classList.remove('hidden')));
+
+      closeBtns.forEach(btn => btn.addEventListener('click', () => {
+        addJobModal.classList.add('hidden');
+        parseJobModal.classList.add('hidden');
+        document.getElementById('parse-results').classList.add('hidden');
+        document.getElementById('job-url-input').value = '';
+      }));
+
+      document.getElementById('run-parse-btn').addEventListener('click', () => {
+        const input = document.getElementById('job-url-input');
+        if (!input.value) {
+          showToast('Please enter a job URL first.');
+          return;
+        }
+
+        const loader = document.getElementById('parse-loading');
+        const results = document.getElementById('parse-results');
+
+        loader.classList.remove('hidden');
+        results.classList.add('hidden');
+
+        setTimeout(() => {
+          loader.classList.add('hidden');
+          results.classList.remove('hidden');
+          showToast('Job parsed successfully!');
+        }, 1500);
+      });
+
+      document.querySelectorAll('.trigger-toast').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const msg = e.currentTarget.getAttribute('data-msg');
+          if (msg) showToast(msg);
+        });
+      });
+
+      document.querySelectorAll('.btn-refresh').forEach(btn => {
+        btn.addEventListener('click', () => showToast('Data refreshed securely.'));
+      });
+
+      document.getElementById('add-job-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addJobModal.classList.add('hidden');
+        showToast('New job added to pipeline!');
+      });
+    });
+  </script>
 </body>
 </html>
