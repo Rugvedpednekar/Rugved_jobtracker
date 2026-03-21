@@ -740,8 +740,8 @@
     .modal {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.26);
-      backdrop-filter: blur(4px);
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(6px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -759,6 +759,8 @@
       border-radius: var(--radius-lg);
       padding: 1.5rem;
       box-shadow: var(--shadow-lg);
+      position: relative;
+      z-index: 101;
     }
 
     .modal-card.modal-wide {
@@ -992,6 +994,17 @@
         border-bottom-right-radius: 0;
       }
 
+      .mobile-inline-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+      }
+
+      .mobile-inline-actions .btn, .mobile-inline-actions input {
+        width: 100%;
+      }
+
       .chatbot-window {
         right: 0.75rem;
         bottom: 5rem;
@@ -1133,7 +1146,7 @@
             <i data-lucide="menu"></i>
           </button>
           <div>
-            <p class="eyebrow">Overview</p>
+            <p class="eyebrow" id="page-eyebrow">Overview</p>
             <h1 id="page-title">Tracker</h1>
           </div>
         </div>
@@ -1141,7 +1154,7 @@
         <div class="topbar-right">
           <div class="topbar-chip">
             <i data-lucide="calendar-days"></i>
-            <span id="briefing-summary">Today's Focus: 2 Follow-ups</span>
+            <span id="briefing-summary">Today's Focus: Dashboard Loading</span>
           </div>
           <button id="refresh-dashboard-btn" class="btn btn-secondary"><i data-lucide="refresh-cw"></i> Refresh</button>
           <button class="btn btn-secondary" data-open-parse-modal type="button"><i data-lucide="wand-2"></i> Parse Link</button>
@@ -1158,22 +1171,22 @@
                   <p class="eyebrow">Daily briefing</p>
                   <h2>Today’s snapshot</h2>
                 </div>
-                <button id="discover-jobs-btn" class="btn btn-secondary"><i data-lucide="refresh-cw"></i></button>
+                <button id="discover-jobs-btn" class="btn btn-secondary btn-compact"><i data-lucide="refresh-cw"></i></button>
               </div>
 
-              <p id="daily-briefing-text" class="hero-copy">You have 0 potentially stale applications and 4 tracked jobs in motion.</p>
+              <p id="daily-briefing-text" class="hero-copy">Your dashboard will summarize applications once your data is loaded.</p>
 
               <div class="briefing-lists">
                 <div>
                   <p class="label">Suggested follow-ups</p>
                   <div id="followup-list" class="list-stack">
-                    <div class="list-item">No follow-ups yet</div>
+                    <div class="empty-state"><strong>No follow-ups yet</strong></div>
                   </div>
                 </div>
                 <div>
                   <p class="label">Today’s focus</p>
                   <div id="focus-list" class="list-stack">
-                    <div class="list-item">No focus items yet</div>
+                    <div class="empty-state"><strong>No focus items yet</strong></div>
                   </div>
                 </div>
               </div>
@@ -1192,9 +1205,9 @@
           </div>
 
           <div class="stats-grid">
-            <article class="panel stat-card"><span>Total Jobs</span><strong id="total-count">4</strong></article>
+            <article class="panel stat-card"><span>Total Jobs</span><strong id="total-count">0</strong></article>
             <article class="panel stat-card"><span>Wishlist</span><strong id="wishlist-count">0</strong></article>
-            <article class="panel stat-card"><span>Applied</span><strong id="applied-count">4</strong></article>
+            <article class="panel stat-card"><span>Applied</span><strong id="applied-count">0</strong></article>
             <article class="panel stat-card"><span>Interview</span><strong id="interview-count">0</strong></article>
             <article class="panel stat-card"><span>Offered</span><strong id="offered-count">0</strong></article>
           </div>
@@ -1238,7 +1251,7 @@
               <p class="eyebrow">Applications</p>
               <h2>Jobs</h2>
             </div>
-            <div class="inline-actions">
+            <div class="inline-actions mobile-inline-actions">
               <button id="jobs-refresh-btn" class="btn btn-secondary"><i data-lucide="refresh-cw"></i> Refresh</button>
               <button class="btn btn-secondary" data-open-parse-modal type="button"><i data-lucide="wand-2"></i> Parse Link</button>
               <button class="btn btn-primary" data-open-add-job type="button"><i data-lucide="plus"></i> Add Job</button>
@@ -1260,7 +1273,8 @@
           </div>
 
           <div id="jobs-list" class="jobs-table">
-            </div>
+            <div class="empty-state"><strong>Loading jobs…</strong></div>
+          </div>
         </section>
 
         <section id="profile" class="section-panel stack-lg hidden">
@@ -1269,7 +1283,7 @@
               <p class="eyebrow">Profile</p>
               <h2>Resume & fit context</h2>
             </div>
-            <div class="inline-actions">
+            <div class="inline-actions mobile-inline-actions">
               <button id="analyze-resume-btn" class="btn btn-secondary"><i data-lucide="cpu"></i> Analyze Resume</button>
               <button id="save-resume-btn" class="btn btn-primary"><i data-lucide="save"></i> Save Profile</button>
             </div>
@@ -1363,7 +1377,7 @@
     <div class="modal-card">
       <div class="section-head compact" style="margin-bottom:1rem;">
         <h3>Add New Job</h3>
-        <button id="close-add-job-modal" class="btn btn-ghost btn-icon-only" type="button"><i data-lucide="x"></i></button>
+        <button id="close-add-job-modal" class="btn btn-ghost btn-icon-only close-modal-btn" type="button"><i data-lucide="x"></i></button>
       </div>
 
       <form id="add-job-form" class="stack-md">
@@ -1388,7 +1402,7 @@
         <input class="field" name="link" type="url" placeholder="Job Link (URL)" />
         <textarea class="field textarea-md" name="notes" placeholder="Personal Notes..."></textarea>
         <div class="inline-actions end">
-          <button id="cancel-add-job-modal" class="btn btn-ghost" type="button">Cancel</button>
+          <button id="cancel-add-job-modal" class="btn btn-ghost close-modal-btn" type="button">Cancel</button>
           <button class="btn btn-primary" type="submit">Save Job</button>
         </div>
       </form>
@@ -1402,11 +1416,11 @@
           <p class="eyebrow">AI intake</p>
           <h3>Parse Job Link</h3>
         </div>
-        <button id="close-parse-job-modal" class="btn btn-ghost btn-icon-only" type="button"><i data-lucide="x"></i></button>
+        <button id="close-parse-job-modal" class="btn btn-ghost btn-icon-only close-modal-btn" type="button"><i data-lucide="x"></i></button>
       </div>
 
       <div class="stack-md">
-        <div class="inline-actions">
+        <div class="inline-actions mobile-inline-actions">
           <input id="job-url-input" class="field" type="url" placeholder="https://company.com/jobs/role-id" />
           <button id="parse-job-btn" class="btn btn-primary" type="button"><i data-lucide="wand-2"></i> Parse</button>
         </div>
@@ -1425,9 +1439,9 @@
 
         <div id="parse-job-results" class="stack-lg hidden">
           <div class="metric-grid">
-            <div class="metric-card"><span>Detected Company</span><strong id="parsed-company">Not specified</strong></div>
-            <div class="metric-card"><span>Detected Role</span><strong id="parsed-role">Not specified</strong></div>
-            <div class="metric-card"><span>Location</span><strong id="parsed-location">Not specified</strong></div>
+            <div class="metric-card"><span>Detected Company</span><strong id="parsed-company">—</strong></div>
+            <div class="metric-card"><span>Detected Role</span><strong id="parsed-role">—</strong></div>
+            <div class="metric-card"><span>Location</span><strong id="parsed-location">—</strong></div>
             <div class="metric-card"><span>Match Score</span><strong id="parsed-match-score" style="color:var(--color-success);">—</strong></div>
           </div>
 
@@ -1441,25 +1455,27 @@
             <p id="parsed-match-summary" class="muted">No match summary yet.</p>
           </div>
 
+          <div id="parsed-tailoring-notes" class="result-card hidden"></div>
+
           <div id="job-actions" class="inline-actions end">
              </div>
 
-          <div id="generated-output" class="result-card">Choose an action to generate or save an output.</div>
+          <div id="generated-output" class="result-card hidden">Choose an action to generate or save an output.</div>
         </div>
       </div>
     </div>
   </div>
 
   <div id="job-details-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-card modal-wide modal-sheet">
-      <div class="section-head compact modal-head">
+    <div class="modal-card modal-wide">
+      <div class="section-head compact modal-head" style="margin-bottom:1rem;">
         <div>
           <p class="eyebrow">Application details</p>
           <h3 id="job-details-title">Job details</h3>
         </div>
         <div class="inline-actions">
           <button id="edit-job-details-btn" class="btn btn-secondary btn-icon-only" type="button" aria-label="Edit job"><i data-lucide="edit-3"></i></button>
-          <button id="close-job-details-modal" class="btn btn-ghost btn-icon-only" type="button"><i data-lucide="x"></i></button>
+          <button id="close-job-details-modal" class="btn btn-ghost btn-icon-only close-modal-btn" type="button"><i data-lucide="x"></i></button>
         </div>
       </div>
       
@@ -1548,13 +1564,13 @@
   </div>
 
   <div id="document-editor-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-card modal-wide modal-sheet">
+    <div class="modal-card modal-wide">
       <div class="section-head compact modal-head" style="margin-bottom:1rem;">
         <div>
           <p class="eyebrow">Document editor</p>
           <h3 id="document-editor-title">Document</h3>
         </div>
-        <button id="close-document-editor-modal" class="btn btn-ghost btn-icon-only" type="button"><i data-lucide="x"></i></button>
+        <button id="close-document-editor-modal" class="btn btn-ghost btn-icon-only close-modal-btn" type="button"><i data-lucide="x"></i></button>
       </div>
       <div class="stack-md modal-scroll-content">
         <input id="document-editor-name" class="field" type="text" placeholder="Document name" />
