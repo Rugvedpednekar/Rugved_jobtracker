@@ -226,7 +226,6 @@ function emptyState(title, message = "") {
   return `<div class="empty-state"><strong>${title}</strong>${message ? `<p>${message}</p>` : ""}</div>`;
 }
 
-
 function initialsForName(name = "") {
   return name
     .split(/\s+/)
@@ -317,6 +316,27 @@ async function api(path, options = {}) {
     throw new Error(data.detail || data.message || "Request failed");
   }
   return data;
+}
+
+// NEW FUNCTION: Handles PDF export natively by communicating with the FastAPI backend
+async function downloadPdf(title, content_text, file_name) {
+  const response = await fetch(`${API_BASE}/api/documents/export-pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, content_text, file_name })
+  });
+  
+  if (!response.ok) throw new Error("Failed to generate PDF");
+  
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file_name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 function normalizeKeywordLines(text) {
@@ -454,7 +474,6 @@ function renderRecommendedJobs() {
     </article>
   `).join("") : emptyState("No recommendations yet", "Run the morning scan or connect data sources to surface real roles.");
 }
-
 
 function filteredJobs() {
   const query = dom.jobsSearchInput?.value?.trim().toLowerCase() || "";
@@ -677,7 +696,6 @@ function renderParseResults() {
   dom.generatedOutput.innerHTML = "Choose an action to generate or save an output.";
 }
 
-
 async function loadDashboard() {
   state.dashboard = await api("/api/dashboard/simple");
   if (dom.gmailSyncStatus) dom.gmailSyncStatus.textContent = state.dashboard.gmail_sync?.message || "Not configured";
@@ -763,12 +781,25 @@ async function handleLogin(event) {
   }
 }
 
+// UPDATED: Wipe state memory completely to prevent ghost data bleeding between users
 async function handleLogout() {
   try {
     await api("/api/auth/logout", { method: "POST" });
   } catch {
     // ignore
   }
+  
+  state.jobs = [];
+  state.recommendedJobs = [];
+  state.documents = [];
+  state.parsedProfile = {};
+  state.dashboard = null;
+  state.chatHistory = [];
+  state.currentIntake = null;
+  state.activeJobDetails = null;
+  state.activeDocument = null;
+  state.currentUser = null;
+
   dom.loginForm.reset();
   showLogin();
   showToast("Logged out");
@@ -1085,9 +1116,17 @@ async function handleParsedActionClick(event) {
   }
 }
 
+// UPDATED: Guarded against undefined DOM elements to prevent silent crashes
 async function handleJobDetailsSave(event) {
   event.preventDefault();
   if (!state.activeJobDetails) return;
+  
+  // Guard check: If your HTML doesn't have an input with this ID yet, alert the user instead of crashing
+  if (!dom.jobDetailsCompany) {
+      showToast("Edit mode UI is not yet implemented.");
+      return;
+  }
+
   try {
     const updatedJob = await api(`/api/jobs/${state.activeJobDetails.id}`, {
       method: "PUT",
@@ -1106,7 +1145,7 @@ async function handleJobDetailsSave(event) {
       })
     });
     state.activeJobDetails = updatedJob;
-    disableJobDetailsEditMode();
+    // disableJobDetailsEditMode(); // Custom logic you will need when building the edit toggle
     await Promise.all([loadJobs(), loadDashboard()]);
     openJobDetailsModal(updatedJob, lastModalTrigger);
     showToast("Job details updated");
