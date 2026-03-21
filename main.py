@@ -45,7 +45,7 @@ BOOTSTRAP_ADMIN_EMAIL = os.getenv("BOOTSTRAP_ADMIN_EMAIL", DASHBOARD_EMAIL).stri
 BOOTSTRAP_ADMIN_PASSWORD = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", DASHBOARD_PASSWORD)
 BOOTSTRAP_ADMIN_PASSWORD_HASH = os.getenv("BOOTSTRAP_ADMIN_PASSWORD_HASH", DASHBOARD_PASSWORD_HASH)
 BOOTSTRAP_ADMIN_FULL_NAME = os.getenv("BOOTSTRAP_ADMIN_FULL_NAME", "Admin User").strip()
-AUTH_SEED_EMAILS = [email.strip().lower() for email in os.getenv("AUTH_SEED_EMAILS", "rugved261@gmail.com,akanshac0204@gmail.com").split(",") if email.strip()]
+AUTH_SEED_EMAILS = [email.strip().lower() for email in os.getenv("AUTH_SEED_EMAILS", "").split(",") if email.strip()]
 AUTH_SEED_DEFAULT_PASSWORD = os.getenv("AUTH_SEED_DEFAULT_PASSWORD", "")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 NOVA_MODEL_ID = os.getenv("NOVA_MODEL_ID", "us.amazon.nova-lite-v1:0")
@@ -133,6 +133,7 @@ if not logger.handlers:
 REQUIRED_COLUMNS = {
     "jobs": {
         "id": "VARCHAR(32) PRIMARY KEY",
+        "user_id": "INTEGER",
         "company": "VARCHAR(255) DEFAULT ''",
         "role": "VARCHAR(255) DEFAULT ''",
         "status": "VARCHAR(32) DEFAULT 'Applied'",
@@ -160,6 +161,7 @@ REQUIRED_COLUMNS = {
     },
     "documents": {
         "id": "VARCHAR(32) PRIMARY KEY",
+        "user_id": "INTEGER",
         "name": "VARCHAR(255) DEFAULT ''",
         "doc_type": "VARCHAR(64) DEFAULT 'other'",
         "content_text": "TEXT DEFAULT ''",
@@ -171,6 +173,7 @@ REQUIRED_COLUMNS = {
     },
     "tasks": {
         "id": "VARCHAR(32) PRIMARY KEY",
+        "user_id": "INTEGER",
         "title": "VARCHAR(255) DEFAULT ''",
         "details": "TEXT DEFAULT ''",
         "status": "VARCHAR(32) DEFAULT 'open'",
@@ -183,6 +186,7 @@ REQUIRED_COLUMNS = {
     },
     "chat_history": {
         "id": "INTEGER",
+        "user_id": "INTEGER",
         "role": "VARCHAR(16)",
         "message": "TEXT",
         "context_type": "VARCHAR(64) DEFAULT 'general'",
@@ -191,6 +195,7 @@ REQUIRED_COLUMNS = {
     },
     "job_intakes": {
         "id": "VARCHAR(32) PRIMARY KEY",
+        "user_id": "INTEGER",
         "url": "TEXT DEFAULT ''",
         "source_host": "VARCHAR(255) DEFAULT ''",
         "raw_html": "TEXT DEFAULT ''",
@@ -204,6 +209,7 @@ REQUIRED_COLUMNS = {
     },
     "recommended_jobs": {
         "id": "VARCHAR(32) PRIMARY KEY",
+        "user_id": "INTEGER",
         "run_id": "VARCHAR(32)",
         "source": "VARCHAR(64) DEFAULT 'scout'",
         "source_job_id": "VARCHAR(255) DEFAULT ''",
@@ -230,6 +236,7 @@ REQUIRED_COLUMNS = {
     },
     "job_search_runs": {
         "id": "VARCHAR(32) PRIMARY KEY",
+        "user_id": "INTEGER",
         "trigger_mode": "VARCHAR(32) DEFAULT 'manual'",
         "status": "VARCHAR(32) DEFAULT 'started'",
         "source_count": "INTEGER DEFAULT 0",
@@ -270,6 +277,7 @@ class JobRecord(TimestampMixin, Base):
     __tablename__ = "jobs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     company: Mapped[str] = mapped_column(String(255), default="")
     role: Mapped[str] = mapped_column(String(255), default="")
     status: Mapped[str] = mapped_column(String(32), default="Applied")
@@ -293,6 +301,7 @@ class JobIntakeRecord(TimestampMixin, Base):
     __tablename__ = "job_intakes"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     url: Mapped[str] = mapped_column(Text, default="")
     source_host: Mapped[str] = mapped_column(String(255), default="")
     raw_html: Mapped[str] = mapped_column(Text, default="")
@@ -307,6 +316,7 @@ class DocumentRecord(TimestampMixin, Base):
     __tablename__ = "documents"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     name: Mapped[str] = mapped_column(String(255), default="")
     doc_type: Mapped[str] = mapped_column(String(64), default="other")
     content_text: Mapped[str] = mapped_column(Text, default="")
@@ -319,6 +329,7 @@ class TaskRecord(TimestampMixin, Base):
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     title: Mapped[str] = mapped_column(String(255), default="")
     details: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="open")
@@ -332,6 +343,7 @@ class ChatHistoryRecord(Base):
     __tablename__ = "chat_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     role: Mapped[str] = mapped_column(String(16))
     message: Mapped[str] = mapped_column(Text)
     context_type: Mapped[str] = mapped_column(String(64), default="general")
@@ -355,6 +367,7 @@ class RecommendedJobRecord(TimestampMixin, Base):
     __tablename__ = "recommended_jobs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     run_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     source: Mapped[str] = mapped_column(String(64), default="scout")
     source_job_id: Mapped[str] = mapped_column(String(255), default="")
@@ -382,6 +395,7 @@ class JobSearchRunRecord(TimestampMixin, Base):
     __tablename__ = "job_search_runs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex[:12])
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
     trigger_mode: Mapped[str] = mapped_column(String(32), default="manual")
     status: Mapped[str] = mapped_column(String(32), default="started")
     source_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -813,11 +827,15 @@ def nova_converse(system_prompt: str, user_prompt: str, temperature: float = 0.2
 
 
 class StateService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
+        self.user_id = user_id
+
+    def _scope_key(self, key: str) -> str:
+        return f"user:{self.user_id}:{key}"
 
     def get(self, key: str) -> Any:
-        record = self.db.get(AppStateRecord, key)
+        record = self.db.get(AppStateRecord, self._scope_key(key))
         if record:
             return safe_json_value(record.value, STATE_DEFAULTS.get(key))
         default = STATE_DEFAULTS.get(key)
@@ -826,9 +844,10 @@ class StateService:
     def set(self, key: str, value: Any) -> None:
         default = STATE_DEFAULTS.get(key)
         stored_value = safe_json_value(value, default) if default is not None else value
-        record = self.db.get(AppStateRecord, key)
+        scoped_key = self._scope_key(key)
+        record = self.db.get(AppStateRecord, scoped_key)
         if record is None:
-            self.db.add(AppStateRecord(key=key, value=stored_value))
+            self.db.add(AppStateRecord(key=scoped_key, value=stored_value))
         else:
             record.value = stored_value
             record.updated_at = datetime.now(timezone.utc)
@@ -836,22 +855,26 @@ class StateService:
     def ensure_defaults(self) -> None:
         changed = False
         for key, value in STATE_DEFAULTS.items():
-            if self.db.get(AppStateRecord, key) is None:
-                self.db.add(AppStateRecord(key=key, value=deep_copy_default(value)))
+            scoped_key = self._scope_key(key)
+            if self.db.get(AppStateRecord, scoped_key) is None:
+                self.db.add(AppStateRecord(key=scoped_key, value=deep_copy_default(value)))
                 changed = True
         if changed:
             self.db.commit()
 
 
 class JobService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     def list(self) -> List[JobRecord]:
-        return list(self.db.scalars(select(JobRecord).order_by(desc(JobRecord.updated_at), desc(JobRecord.created_at))))
+        stmt = select(JobRecord).where(JobRecord.user_id == self.user_id).order_by(desc(JobRecord.updated_at), desc(JobRecord.created_at))
+        return list(self.db.scalars(stmt))
 
     def create(self, payload: JobCreate) -> JobRecord:
         job = JobRecord(
+            user_id=self.user_id,
             company=payload.company.strip(),
             role=payload.role.strip(),
             status=normalize_status(payload.status),
@@ -876,7 +899,7 @@ class JobService:
         return job
 
     def update(self, job_id: str, payload: JobUpdate) -> JobRecord:
-        job = self.db.get(JobRecord, job_id)
+        job = self.db.scalar(select(JobRecord).where(JobRecord.id == job_id, JobRecord.user_id == self.user_id))
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
         for field, value in payload.model_dump(exclude_unset=True).items():
@@ -893,7 +916,7 @@ class JobService:
         return job
 
     def delete(self, job_id: str) -> None:
-        job = self.db.get(JobRecord, job_id)
+        job = self.db.scalar(select(JobRecord).where(JobRecord.id == job_id, JobRecord.user_id == self.user_id))
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
         self.db.delete(job)
@@ -901,15 +924,17 @@ class JobService:
 
 
 class ChatService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     def append(self, role: str, message: str, context_type: str = "general", linked_job_id: Optional[str] = None) -> None:
-        self.db.add(ChatHistoryRecord(role=role, message=message.strip(), context_type=context_type, linked_job_id=linked_job_id))
+        self.db.add(ChatHistoryRecord(user_id=self.user_id, role=role, message=message.strip(), context_type=context_type, linked_job_id=linked_job_id))
         self.db.commit()
 
     def tail(self, limit: int = 12) -> List[Dict[str, Any]]:
-        rows = list(self.db.scalars(select(ChatHistoryRecord).order_by(desc(ChatHistoryRecord.created_at)).limit(limit)))
+        stmt = select(ChatHistoryRecord).where(ChatHistoryRecord.user_id == self.user_id).order_by(desc(ChatHistoryRecord.created_at)).limit(limit)
+        rows = list(self.db.scalars(stmt))
         rows.reverse()
         return [
             {
@@ -924,23 +949,25 @@ class ChatService:
 
 
 class DocumentService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     def list(self) -> List[DocumentRecord]:
-        return list(self.db.scalars(select(DocumentRecord).where(DocumentRecord.is_active.is_(True)).order_by(desc(DocumentRecord.updated_at))))
+        stmt = select(DocumentRecord).where(DocumentRecord.user_id == self.user_id, DocumentRecord.is_active.is_(True)).order_by(desc(DocumentRecord.updated_at))
+        return list(self.db.scalars(stmt))
 
     def get(self, document_id: str) -> DocumentRecord:
-        record = self.db.get(DocumentRecord, document_id)
+        record = self.db.scalar(select(DocumentRecord).where(DocumentRecord.id == document_id, DocumentRecord.user_id == self.user_id))
         if record is None or not record.is_active:
             raise HTTPException(status_code=404, detail="Document not found")
         return record
 
     def upsert_text_document(self, name: str, doc_type: str, content_text: str, linked_job_id: Optional[str] = None, metadata_json: Optional[Dict[str, Any]] = None) -> DocumentRecord:
-        stmt = select(DocumentRecord).where(DocumentRecord.doc_type == doc_type, DocumentRecord.linked_job_id == linked_job_id, DocumentRecord.is_active.is_(True))
+        stmt = select(DocumentRecord).where(DocumentRecord.user_id == self.user_id, DocumentRecord.doc_type == doc_type, DocumentRecord.linked_job_id == linked_job_id, DocumentRecord.is_active.is_(True))
         record = self.db.scalar(stmt)
         if record is None:
-            record = DocumentRecord(name=name, doc_type=doc_type, linked_job_id=linked_job_id)
+            record = DocumentRecord(user_id=self.user_id, name=name, doc_type=doc_type, linked_job_id=linked_job_id)
             self.db.add(record)
         record.content_text = content_text.strip()
         record.name = name
@@ -962,11 +989,13 @@ class DocumentService:
 
 
 class TaskService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     def list(self) -> List[TaskRecord]:
-        return list(self.db.scalars(select(TaskRecord).order_by(TaskRecord.status.asc(), TaskRecord.due_date.asc(), desc(TaskRecord.created_at))))
+        stmt = select(TaskRecord).where(TaskRecord.user_id == self.user_id).order_by(TaskRecord.status.asc(), TaskRecord.due_date.asc(), desc(TaskRecord.created_at))
+        return list(self.db.scalars(stmt))
 
     def create_many(self, tasks: List[Dict[str, Any]], linked_job_id: Optional[str] = None) -> List[TaskRecord]:
         created: List[TaskRecord] = []
@@ -982,6 +1011,7 @@ class TaskService:
                 except ValueError:
                     due_date = None
             record = TaskRecord(
+                user_id=self.user_id,
                 title=title,
                 details=(task.get("details") or "").strip(),
                 status=task.get("status", "open") if task.get("status") in TASK_STATUSES else "open",
@@ -998,7 +1028,7 @@ class TaskService:
         return created
 
     def update_status(self, task_id: str, status: str) -> TaskRecord:
-        task = self.db.get(TaskRecord, task_id)
+        task = self.db.scalar(select(TaskRecord).where(TaskRecord.id == task_id, TaskRecord.user_id == self.user_id))
         if task is None:
             raise HTTPException(status_code=404, detail="Task not found")
         task.status = status if status in TASK_STATUSES else "open"
@@ -1009,11 +1039,13 @@ class TaskService:
 
 
 class IntakeService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     def create(self, url: str, raw_html: str, raw_text: str, parsed_job: Dict[str, Any], suggested_actions: List[Dict[str, Any]]) -> JobIntakeRecord:
         intake = JobIntakeRecord(
+            user_id=self.user_id,
             url=url,
             source_host=urlparse(url).netloc,
             raw_html=raw_html,
@@ -1028,7 +1060,7 @@ class IntakeService:
         return intake
 
     def set_action(self, intake_id: str, action: str) -> JobIntakeRecord:
-        intake = self.db.get(JobIntakeRecord, intake_id)
+        intake = self.db.scalar(select(JobIntakeRecord).where(JobIntakeRecord.id == intake_id, JobIntakeRecord.user_id == self.user_id))
         if intake is None:
             raise HTTPException(status_code=404, detail="Job intake not found")
         intake.selected_action = action
@@ -1038,24 +1070,26 @@ class IntakeService:
         return intake
 
     def recent(self, limit: int = 8) -> List[JobIntakeRecord]:
-        return list(self.db.scalars(select(JobIntakeRecord).order_by(desc(JobIntakeRecord.created_at)).limit(limit)))
+        stmt = select(JobIntakeRecord).where(JobIntakeRecord.user_id == self.user_id).order_by(desc(JobIntakeRecord.created_at)).limit(limit)
+        return list(self.db.scalars(stmt))
 
 
 class RecommendedJobService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     def list_active(self, limit: int = 12) -> List[RecommendedJobRecord]:
         stmt = (
             select(RecommendedJobRecord)
-            .where(RecommendedJobRecord.is_active.is_(True), RecommendedJobRecord.status == "recommended")
+            .where(RecommendedJobRecord.user_id == self.user_id, RecommendedJobRecord.is_active.is_(True), RecommendedJobRecord.status == "recommended")
             .order_by(desc(RecommendedJobRecord.score), desc(RecommendedJobRecord.created_at))
             .limit(limit)
         )
         return list(self.db.scalars(stmt))
 
     def dismiss(self, recommended_job_id: str) -> RecommendedJobRecord:
-        job = self.db.get(RecommendedJobRecord, recommended_job_id)
+        job = self.db.scalar(select(RecommendedJobRecord).where(RecommendedJobRecord.id == recommended_job_id, RecommendedJobRecord.user_id == self.user_id))
         if job is None:
             raise HTTPException(status_code=404, detail="Recommended job not found")
         job.status = "dismissed"
@@ -1067,13 +1101,14 @@ class RecommendedJobService:
 
     def save_run_results(self, run_id: str, jobs: List[Dict[str, Any]]) -> None:
         if jobs:
-            existing = list(self.db.scalars(select(RecommendedJobRecord).where(RecommendedJobRecord.is_active.is_(True))))
+            existing = list(self.db.scalars(select(RecommendedJobRecord).where(RecommendedJobRecord.user_id == self.user_id, RecommendedJobRecord.is_active.is_(True))))
             existing_keys = {(item.company.strip().lower(), item.role.strip().lower(), item.link.strip()) for item in existing}
             for item in jobs:
                 dedupe_key = (item["company"].strip().lower(), item["role"].strip().lower(), item["link"].strip())
                 if dedupe_key in existing_keys:
                     continue
                 record = RecommendedJobRecord(
+                    user_id=self.user_id,
                     run_id=run_id,
                     source=item["source"],
                     source_job_id=item["source_job_id"],
@@ -1099,9 +1134,10 @@ class RecommendedJobService:
 
 
 class JobScoutService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int):
         self.db = db
-        self.state = StateService(db)
+        self.user_id = user_id
+        self.state = StateService(db, user_id)
 
     def discover(self, trigger_mode: str = "manual") -> Dict[str, Any]:
         settings = self.state.get("settings") or DEFAULT_SETTINGS
@@ -1115,7 +1151,7 @@ class JobScoutService:
             "target_roles": self._target_roles(settings, parsed_profile),
         }
         minimum_score = max(50, min(int(settings.get("minimum_job_match_score", 72) or 72), 95))
-        run = JobSearchRunRecord(trigger_mode=trigger_mode, status="started", minimum_score=minimum_score, query_context=context)
+        run = JobSearchRunRecord(user_id=self.user_id, trigger_mode=trigger_mode, status="started", minimum_score=minimum_score, query_context=context)
         self.db.add(run)
         self.db.commit()
         self.db.refresh(run)
@@ -1134,7 +1170,7 @@ class JobScoutService:
             run.recommended_count = len(recommended)
             run.rejected_count = max(0, len(discovered) - len(recommended))
             run.updated_at = datetime.now(timezone.utc)
-            RecommendedJobService(self.db).save_run_results(run.id, recommended)
+            RecommendedJobService(self.db, self.user_id).save_run_results(run.id, recommended)
             self.state.set("last_sync", {"status": "job_scout_manual", "updated_at": utc_now(), "run_id": run.id})
             self.db.commit()
             return {
@@ -1143,7 +1179,7 @@ class JobScoutService:
                 "discovered_count": run.discovered_count,
                 "recommended_count": run.recommended_count,
                 "minimum_score": minimum_score,
-                "recommended_jobs": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(self.db).list_active(limit=12)],
+                "recommended_jobs": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(self.db, self.user_id).list_active(limit=12)],
                 "scheduler_ready": {
                     "trigger_mode": trigger_mode,
                     "next_step": "Call POST /api/jobs/discover from a Railway cron service each morning.",
@@ -1697,13 +1733,13 @@ def generate_daily_briefing(jobs: List[Dict[str, Any]], tasks: List[Dict[str, An
     }
 
 
-def load_context(db: Session) -> Dict[str, Any]:
-    state = StateService(db)
-    jobs = [serialize_job(job) for job in JobService(db).list()]
-    tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
-    parsed_jobs = [safe_json_value(item.parsed_job, {}) for item in IntakeService(db).recent(limit=6)]
-    documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()][:6]
-    recommended_jobs = [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db).list_active(limit=8)]
+def load_context(db: Session, user_id: int) -> Dict[str, Any]:
+    state = StateService(db, user_id)
+    jobs = [serialize_job(job) for job in JobService(db, user_id).list()]
+    tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db, user_id).list()]
+    parsed_jobs = [safe_json_value(item.parsed_job, {}) for item in IntakeService(db, user_id).recent(limit=6)]
+    documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db, user_id).list()][:6]
+    recommended_jobs = [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db, user_id).list_active(limit=8)]
     return {
         "stats": compute_job_stats(jobs),
         "jobs": compact_jobs_for_prompt(jobs),
@@ -1716,7 +1752,7 @@ def load_context(db: Session) -> Dict[str, Any]:
         "documents": documents,
         "recommended_jobs": recommended_jobs,
         "last_sync": state.get("last_sync"),
-        "chat_history": ChatService(db).tail(limit=10),
+        "chat_history": ChatService(db, user_id).tail(limit=10),
         "gmail_sync": gmail_sync_service.get_status(),
         "daily_briefing": generate_daily_briefing(jobs, tasks),
     }
@@ -1767,7 +1803,6 @@ def initialize_database() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_schema_compatibility()
     with SessionLocal() as db:
-        StateService(db).ensure_defaults()
         user_service = UserService(db)
         user_service.ensure_bootstrap_admin()
         if AUTH_SEED_DEFAULT_PASSWORD and AUTH_SEED_EMAILS:
@@ -1905,10 +1940,11 @@ def auth_me(user: Dict[str, Any] = Depends(require_auth)):
 
 
 @app.get("/api/dashboard/simple")
-def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def simple_dashboard(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     try:
-        jobs = [serialize_job(job) for job in JobService(db).list()]
-        tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
+        user_id = user["user_id"]
+        jobs = [serialize_job(job) for job in JobService(db, user_id).list()]
+        tasks = [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db, user_id).list()]
         stats = compute_job_stats(jobs)
         columns = {status: [] for status in ["Wishlist", "Applied", "Interview", "Offered", "Accepted", "Later"]}
         for job in jobs:
@@ -1918,10 +1954,10 @@ def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = De
             "stats": stats,
             "columns": columns,
             "recent_jobs": jobs[:8],
-            "recommended_today": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db).list_active(limit=6)],
-            "recent_intakes": [safe_json_value(item.parsed_job, {}) for item in IntakeService(db).recent(limit=4)],
-            "profile_summary": StateService(db).get("parsed_profile") or DEFAULT_PARSED_PROFILE,
-            "keywords": StateService(db).get("keywords") or [],
+            "recommended_today": [RecommendedJobResponse.model_validate(item).model_dump(mode="json") for item in RecommendedJobService(db, user_id).list_active(limit=6)],
+            "recent_intakes": [safe_json_value(item.parsed_job, {}) for item in IntakeService(db, user_id).recent(limit=4)],
+            "profile_summary": StateService(db, user_id).get("parsed_profile") or DEFAULT_PARSED_PROFILE,
+            "keywords": StateService(db, user_id).get("keywords") or [],
             "daily_briefing": generate_daily_briefing(jobs, tasks),
             "gmail_sync": gmail_sync_service.get_status(),
         }
@@ -1930,46 +1966,47 @@ def simple_dashboard(_: Dict[str, Any] = Depends(require_auth), db: Session = De
 
 
 @app.get("/api/jobs")
-def get_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def get_jobs(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     try:
-        return [serialize_job(job) for job in JobService(db).list()]
+        return [serialize_job(job) for job in JobService(db, user["user_id"]).list()]
     except Exception as exc:
         handle_database_exception("/api/jobs", exc)
 
 
 @app.post("/api/jobs/discover")
-def discover_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return JobScoutService(db).discover(trigger_mode="manual")
+def discover_jobs(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return JobScoutService(db, user["user_id"]).discover(trigger_mode="manual")
 
 
 @app.get("/api/jobs/recommended")
-def get_recommended_jobs(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return [RecommendedJobResponse.model_validate(job).model_dump(mode="json") for job in RecommendedJobService(db).list_active(limit=18)]
+def get_recommended_jobs(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return [RecommendedJobResponse.model_validate(job).model_dump(mode="json") for job in RecommendedJobService(db, user["user_id"]).list_active(limit=18)]
 
 
 @app.post("/api/jobs")
-def add_job(payload: JobCreate, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def add_job(payload: JobCreate, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     if not payload.company.strip() or not payload.role.strip():
         raise HTTPException(status_code=400, detail="Company and role are required")
-    return JobResponse.model_validate(JobService(db).create(payload)).model_dump(mode="json")
+    return JobResponse.model_validate(JobService(db, user["user_id"]).create(payload)).model_dump(mode="json")
 
 
 @app.put("/api/jobs/{job_id}")
-def update_job(job_id: str, payload: JobUpdate, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return JobResponse.model_validate(JobService(db).update(job_id, payload)).model_dump(mode="json")
+def update_job(job_id: str, payload: JobUpdate, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return JobResponse.model_validate(JobService(db, user["user_id"]).update(job_id, payload)).model_dump(mode="json")
 
 
 @app.delete("/api/jobs/{job_id}")
-def delete_job(job_id: str, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    JobService(db).delete(job_id)
+def delete_job(job_id: str, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    JobService(db, user["user_id"]).delete(job_id)
     return {"ok": True}
 
 
 @app.post("/api/jobs/parse-link")
-def parse_job_link(payload: ParseJobLinkRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def parse_job_link(payload: ParseJobLinkRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    user_id = user["user_id"]
     fetched = fetch_job_url(str(payload.url))
     parsed_job = ai_parse_job_description(fetched["text"], str(payload.url))
-    state = StateService(db)
+    state = StateService(db, user_id)
     match_analysis = ai_match_resume(
         parsed_job,
         state.get("resume_text") or "",
@@ -1985,7 +2022,7 @@ def parse_job_link(payload: ParseJobLinkRequest, _: Dict[str, Any] = Depends(req
         {"id": "save_later", "label": "Save for later", "description": "Store the job with minimal follow-up pressure."},
     ]
     tasks = ai_suggest_tasks(parsed_job, match_analysis)
-    intake = IntakeService(db).create(str(payload.url), fetched["html"], fetched["text"], parsed_job, suggested_actions)
+    intake = IntakeService(db, user_id).create(str(payload.url), fetched["html"], fetched["text"], parsed_job, suggested_actions)
     return {
         "intake_id": intake.id,
         "parsed_job": parsed_job,
@@ -1996,19 +2033,20 @@ def parse_job_link(payload: ParseJobLinkRequest, _: Dict[str, Any] = Depends(req
 
 
 @app.post("/api/jobs/action")
-def apply_job_action(payload: JobActionRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    intake_service = IntakeService(db)
-    intake = db.get(JobIntakeRecord, payload.intake_id)
+def apply_job_action(payload: JobActionRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    user_id = user["user_id"]
+    intake_service = IntakeService(db, user_id)
+    intake = db.scalar(select(JobIntakeRecord).where(JobIntakeRecord.id == payload.intake_id, JobIntakeRecord.user_id == user_id))
     if intake is None:
         raise HTTPException(status_code=404, detail="Job intake not found")
     parsed_job = intake.parsed_job or {}
-    state = StateService(db)
+    state = StateService(db, user_id)
     match_analysis = ai_match_resume(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE, state.get("keywords") or [])
     response: Dict[str, Any] = {"action": payload.action, "job": None, "document": None}
     linked_job: Optional[JobRecord] = None
 
     if payload.action in ACTION_TO_STATUS:
-        linked_job = JobService(db).create(JobCreate(
+        linked_job = JobService(db, user_id).create(JobCreate(
             company=payload.company or parsed_job.get("company", "Unknown company"),
             role=payload.role or parsed_job.get("role", "Unknown role"),
             status=ACTION_TO_STATUS[payload.action],
@@ -2032,7 +2070,7 @@ def apply_job_action(payload: JobActionRequest, _: Dict[str, Any] = Depends(requ
         response["match_analysis"] = match_analysis
     elif payload.action == "generate_resume":
         content = ai_generate_tailored_resume(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE)
-        document = DocumentService(db).upsert_text_document(
+        document = DocumentService(db, user_id).upsert_text_document(
             name=f"Tailored Resume - {parsed_job.get('company', 'Target')}",
             doc_type="tailored_resume",
             content_text=content,
@@ -2043,7 +2081,7 @@ def apply_job_action(payload: JobActionRequest, _: Dict[str, Any] = Depends(requ
         response["match_analysis"] = match_analysis
     elif payload.action == "generate_cover_letter":
         content = ai_generate_cover_letter(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE, state.get("settings") or DEFAULT_SETTINGS)
-        document = DocumentService(db).upsert_text_document(
+        document = DocumentService(db, user_id).upsert_text_document(
             name=f"Cover Letter - {parsed_job.get('company', 'Target')}",
             doc_type="generated_cover_letter",
             content_text=content,
@@ -2057,8 +2095,9 @@ def apply_job_action(payload: JobActionRequest, _: Dict[str, Any] = Depends(requ
 
 
 @app.post("/api/jobs/recommended/{recommended_job_id}/action")
-def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    recommended = db.get(RecommendedJobRecord, recommended_job_id)
+def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    user_id = user["user_id"]
+    recommended = db.scalar(select(RecommendedJobRecord).where(RecommendedJobRecord.id == recommended_job_id, RecommendedJobRecord.user_id == user_id))
     if recommended is None:
         raise HTTPException(status_code=404, detail="Recommended job not found")
     action = (payload.get("action") or "").strip()
@@ -2075,7 +2114,7 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: 
         "field": recommended.domain,
         "source_url": recommended.link,
     }
-    state = StateService(db)
+    state = StateService(db, user_id)
     match_analysis = {
         "score": recommended.score,
         "summary": "High-match recommendation from Morning Job Scout.",
@@ -2084,13 +2123,13 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: 
     }
 
     if action == "dismiss":
-        job = RecommendedJobService(db).dismiss(recommended_job_id)
+        job = RecommendedJobService(db, user_id).dismiss(recommended_job_id)
         return {"ok": True, "recommended_job": RecommendedJobResponse.model_validate(job).model_dump(mode="json")}
 
     linked_job = None
     document = None
     if action in {"apply", "save_to_wishlist"}:
-        linked_job = JobService(db).create(JobCreate(
+        linked_job = JobService(db, user_id).create(JobCreate(
             company=recommended.company,
             role=recommended.role,
             status="Applied" if action == "apply" else "Wishlist",
@@ -2109,7 +2148,7 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: 
         ))
     elif action == "generate_resume":
         content = ai_generate_tailored_resume(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE)
-        document = DocumentService(db).upsert_text_document(
+        document = DocumentService(db, user_id).upsert_text_document(
             name=f"Tailored Resume - {recommended.company}",
             doc_type="tailored_resume",
             content_text=content,
@@ -2117,7 +2156,7 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: 
         )
     elif action == "generate_cover_letter":
         content = ai_generate_cover_letter(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE, state.get("settings") or DEFAULT_SETTINGS)
-        document = DocumentService(db).upsert_text_document(
+        document = DocumentService(db, user_id).upsert_text_document(
             name=f"Cover Letter - {recommended.company}",
             doc_type="generated_cover_letter",
             content_text=content,
@@ -2139,23 +2178,23 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], _: 
 
 
 @app.get("/api/tasks")
-def list_tasks(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db).list()]
+def list_tasks(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return [TaskResponse.model_validate(task).model_dump(mode="json") for task in TaskService(db, user["user_id"]).list()]
 
 
 @app.put("/api/tasks/{task_id}")
-def update_task(task_id: str, payload: TaskUpdateRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return TaskResponse.model_validate(TaskService(db).update_status(task_id, payload.status)).model_dump(mode="json")
+def update_task(task_id: str, payload: TaskUpdateRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return TaskResponse.model_validate(TaskService(db, user["user_id"]).update_status(task_id, payload.status)).model_dump(mode="json")
 
 
 @app.get("/api/documents")
-def list_documents(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()]
+def list_documents(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db, user["user_id"]).list()]
 
 
 @app.put("/api/documents/{document_id}")
-def update_document(document_id: str, payload: DocumentUpdateRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    document = DocumentService(db).update(document_id, payload.content_text, payload.name)
+def update_document(document_id: str, payload: DocumentUpdateRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    document = DocumentService(db, user["user_id"]).update(document_id, payload.content_text, payload.name)
     return DocumentResponse.model_validate(document).model_dump(mode="json")
 
 
@@ -2189,26 +2228,28 @@ def upload_resume(file: UploadFile = File(...), _: Dict[str, Any] = Depends(requ
 
 
 @app.post("/api/resume/save")
-def save_resume(req: ResumeSaveRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    state = StateService(db)
+def save_resume(req: ResumeSaveRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    user_id = user["user_id"]
+    state = StateService(db, user_id)
     state.set("resume_text", req.resume_text)
     parsed_profile = req.parsed_profile or ai_parse_resume(req.resume_text)
     state.set("parsed_profile", parsed_profile)
-    DocumentService(db).upsert_text_document("Primary Resume", "resume", req.resume_text, metadata_json={"active": True})
+    DocumentService(db, user_id).upsert_text_document("Primary Resume", "resume", req.resume_text, metadata_json={"active": True})
     db.commit()
     return {"ok": True, "parsed_profile": parsed_profile}
 
 
 @app.get("/api/profile")
-def get_profile(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def get_profile(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     try:
-        state = StateService(db)
-        documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db).list()]
+        user_id = user["user_id"]
+        state = StateService(db, user_id)
+        documents = [DocumentResponse.model_validate(doc).model_dump(mode="json") for doc in DocumentService(db, user_id).list()]
         current_resume_document = next((doc for doc in documents if doc["doc_type"] == "resume"), None)
         return {
             "resume_text": state.get("resume_text") or "",
             "parsed_profile": state.get("parsed_profile") or DEFAULT_PARSED_PROFILE,
-            "chat_history": ChatService(db).tail(limit=12),
+            "chat_history": ChatService(db, user_id).tail(limit=12),
             "documents": documents,
             "current_resume_document": current_resume_document,
         }
@@ -2217,25 +2258,25 @@ def get_profile(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends
 
 
 @app.get("/api/keywords")
-def get_keywords(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return {"keywords": StateService(db).get("keywords") or []}
+def get_keywords(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return {"keywords": StateService(db, user["user_id"]).get("keywords") or []}
 
 
 @app.post("/api/keywords")
-def save_keywords(req: KeywordsRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def save_keywords(req: KeywordsRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     cleaned = [item.strip() for item in req.keywords if item.strip()]
-    StateService(db).set("keywords", cleaned)
+    StateService(db, user["user_id"]).set("keywords", cleaned)
     db.commit()
     return {"keywords": cleaned}
 
 
 @app.get("/api/settings")
-def get_settings(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return {"settings": StateService(db).get("settings") or DEFAULT_SETTINGS, "gmail_sync": gmail_sync_service.get_status()}
+def get_settings(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return {"settings": StateService(db, user["user_id"]).get("settings") or DEFAULT_SETTINGS, "gmail_sync": gmail_sync_service.get_status()}
 
 
 @app.post("/api/settings")
-def save_settings(req: SettingsRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def save_settings(req: SettingsRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     payload = {
         "sync_window_hours": max(1, min(req.sync_window_hours, 168)),
         "preferred_location": req.preferred_location.strip(),
@@ -2246,7 +2287,7 @@ def save_settings(req: SettingsRequest, _: Dict[str, Any] = Depends(require_auth
         "user_notes": req.user_notes.strip(),
         "tone": req.tone.strip() or "concise",
     }
-    state = StateService(db)
+    state = StateService(db, user["user_id"])
     state.set("settings", payload)
     state.set("last_sync", {"status": "manual", "updated_at": utc_now()})
     db.commit()
@@ -2254,11 +2295,11 @@ def save_settings(req: SettingsRequest, _: Dict[str, Any] = Depends(require_auth
 
 
 @app.post("/api/email/parse")
-def parse_email(req: EmailParseRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def parse_email(req: EmailParseRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     result = ai_parse_email(req.email_text)
     linked_job = None
     if req.job_id:
-        job = db.get(JobRecord, req.job_id)
+        job = db.scalar(select(JobRecord).where(JobRecord.id == req.job_id, JobRecord.user_id == user["user_id"]))
         if job:
             job.status = result["status"]
             job.updated_at = datetime.now(timezone.utc)
@@ -2268,17 +2309,18 @@ def parse_email(req: EmailParseRequest, _: Dict[str, Any] = Depends(require_auth
 
 
 @app.get("/api/assistant/context")
-def assistant_context(_: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
-    return load_context(db)
+def assistant_context(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+    return load_context(db, user["user_id"])
 
 
 @app.post("/api/chat")
-def chat(req: ChatRequest, _: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
+def chat(req: ChatRequest, user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
-    context = load_context(db)
+    user_id = user["user_id"]
+    context = load_context(db, user_id)
     answer = ai_chat(req.message.strip(), context)
-    chat_service = ChatService(db)
+    chat_service = ChatService(db, user_id)
     chat_service.append("user", req.message.strip(), context_type="chat")
     chat_service.append("assistant", answer, context_type="chat")
     return {"answer": answer, "history": chat_service.tail(limit=12)}
