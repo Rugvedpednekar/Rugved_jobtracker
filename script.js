@@ -228,6 +228,28 @@ function showApp() {
   if (!isMobileViewport()) closeSidebar();
 }
 
+function openDocumentEditorModal() {
+  const modal = document.getElementById("document-editor-modal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeDocumentEditorModal() {
+  const modal = document.getElementById("document-editor-modal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+const documentEditorModal = document.getElementById("document-editor-modal");
+
+documentEditorModal?.addEventListener("click", (e) => {
+  if (e.target === documentEditorModal) {
+    closeDocumentEditorModal();
+  }
+});
+
 function setSection(sectionId) {
   dom.panels.forEach(panel => panel.classList.toggle("hidden", panel.id !== sectionId));
   dom.navButtons.forEach(button => button.classList.toggle("active", button.dataset.section === sectionId));
