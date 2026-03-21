@@ -169,6 +169,10 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => dom.toast.classList.add("hidden"), 2400);
 }
 
+function jobIdEquals(left, right) {
+  return String(left ?? "") === String(right ?? "");
+}
+
 function safeText(value, fallback = "—") {
   return value || fallback;
 }
@@ -293,6 +297,35 @@ function renderChips(items = []) {
   return items.map(item => `<span class="chip">${item}</span>`).join("");
 }
 
+function renderParsedProfile(profile = {}) {
+  if (!dom.parsedProfileOutput) return;
+  dom.parsedProfileOutput.textContent = JSON.stringify(profile, null, 2);
+}
+
+function setResumeMeta(profile = {}) {
+  if (dom.resumeMeta) {
+    const resumeDocument = state.currentResumeDocument;
+    dom.resumeMeta.textContent = resumeDocument
+      ? `${safeText(resumeDocument.name, "Resume")} • Updated ${formatDateTimeValue(resumeDocument.updated_at, "recently")}`
+      : "No saved resume document yet.";
+  }
+  if (dom.resumeUploadStatus) {
+    dom.resumeUploadStatus.textContent = profile.resume_text
+      ? "Resume content loaded."
+      : "Upload a resume or paste your latest resume text.";
+  }
+}
+
+function openDocumentEditor(document, subtitle = "") {
+  if (!document || !dom.documentEditorModal || !dom.documentEditorName || !dom.documentEditorText) return;
+  state.activeDocument = document;
+  if (dom.documentEditorTitle) dom.documentEditorTitle.textContent = safeText(document.name, "Document");
+  if (dom.documentEditorSubtitle) dom.documentEditorSubtitle.textContent = subtitle || safeText(document.doc_type, "Saved document");
+  dom.documentEditorName.value = document.name || "";
+  dom.documentEditorText.value = document.content_text || "";
+  openDocumentEditorModal();
+}
+
 function renderTrackerCard(job) {
   return `
     <article class="job-card-mini">
@@ -307,26 +340,28 @@ function renderTrackerCard(job) {
 }
 
 function renderBoardColumn(element, items, label) {
+  if (!element) return;
   element.innerHTML = items.length
     ? items.map(renderTrackerCard).join("")
     : emptyState(`No ${label.toLowerCase()} jobs yet`, "This column will populate when a real job reaches this stage.");
 }
 
 function renderDashboard() {
+  if (!dom.totalCount) return;
   const data = state.dashboard || { stats: {}, columns: {}, daily_briefing: {} };
   const stats = data.stats || {};
-  dom.totalCount.textContent = stats.total_jobs || 0;
-  dom.wishlistCount.textContent = stats.wishlist_count || 0;
-  dom.appliedCount.textContent = stats.applied_count || 0;
-  dom.interviewCount.textContent = stats.interview_count || 0;
-  dom.offeredCount.textContent = stats.offered_count || 0;
-  dom.acceptedCount.textContent = stats.accepted_count || 0;
-  dom.wishlistBadge.textContent = stats.wishlist_count || 0;
-  dom.appliedBadge.textContent = stats.applied_count || 0;
-  dom.interviewBadge.textContent = stats.interview_count || 0;
-  dom.offeredBadge.textContent = stats.offered_count || 0;
-  dom.acceptedBadge.textContent = stats.accepted_count || 0;
-  dom.laterBadge.textContent = stats.later_count || 0;
+  if (dom.totalCount) dom.totalCount.textContent = stats.total_jobs || 0;
+  if (dom.wishlistCount) dom.wishlistCount.textContent = stats.wishlist_count || 0;
+  if (dom.appliedCount) dom.appliedCount.textContent = stats.applied_count || 0;
+  if (dom.interviewCount) dom.interviewCount.textContent = stats.interview_count || 0;
+  if (dom.offeredCount) dom.offeredCount.textContent = stats.offered_count || 0;
+  if (dom.acceptedCount) dom.acceptedCount.textContent = stats.accepted_count || 0;
+  if (dom.wishlistBadge) dom.wishlistBadge.textContent = stats.wishlist_count || 0;
+  if (dom.appliedBadge) dom.appliedBadge.textContent = stats.applied_count || 0;
+  if (dom.interviewBadge) dom.interviewBadge.textContent = stats.interview_count || 0;
+  if (dom.offeredBadge) dom.offeredBadge.textContent = stats.offered_count || 0;
+  if (dom.acceptedBadge) dom.acceptedBadge.textContent = stats.accepted_count || 0;
+  if (dom.laterBadge) dom.laterBadge.textContent = stats.later_count || 0;
   renderBoardColumn(dom.wishlistColumn, data.columns?.Wishlist || [], "Wishlist");
   renderBoardColumn(dom.appliedColumn, data.columns?.Applied || [], "Applied");
   renderBoardColumn(dom.interviewColumn, data.columns?.Interview || [], "Interview");
@@ -335,15 +370,15 @@ function renderDashboard() {
   renderBoardColumn(dom.laterColumn, data.columns?.Later || [], "Later");
 
   const briefing = data.daily_briefing || {};
-  dom.briefingSummary.textContent = briefing.summary || "No briefing available yet.";
-  dom.dailyBriefingText.textContent = briefing.summary || "No briefing available yet.";
-  dom.followupList.innerHTML = (briefing.follow_up_suggestions || []).length
+  if (dom.briefingSummary) dom.briefingSummary.textContent = briefing.summary || "No briefing available yet.";
+  if (dom.dailyBriefingText) dom.dailyBriefingText.textContent = briefing.summary || "No briefing available yet.";
+  if (dom.followupList) dom.followupList.innerHTML = (briefing.follow_up_suggestions || []).length
     ? briefing.follow_up_suggestions.map(item => `<div class="list-item">${item}</div>`).join("")
     : emptyState("No follow-ups yet", "Your actual reminders will appear here after activity is recorded.");
-  dom.focusList.innerHTML = (briefing.focus_today || []).length
+  if (dom.focusList) dom.focusList.innerHTML = (briefing.focus_today || []).length
     ? briefing.focus_today.map(item => `<div class="list-item">${item}</div>`).join("")
     : emptyState("No focus items yet", "Once applications move or become stale, the highest-priority next steps will appear here.");
-  dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
+  if (dom.recentIntakes) dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
     ? data.recent_intakes.map(item => `<div class="list-item"><strong>${safeText(item.company)}</strong><p class="muted">${safeText(item.role)} • ${safeText(item.location, "Location pending")}</p></div>`).join("")
     : emptyState("No parsed jobs yet", "Parsed job links will appear here after successful intake.");
   if (data.recommended_today) {
@@ -353,6 +388,7 @@ function renderDashboard() {
 }
 
 function renderRecommendedJobs() {
+  if (!dom.recommendedMeta || !dom.recommendedJobsList) return;
   const jobs = state.recommendedJobs || [];
   dom.recommendedMeta.textContent = jobs.length
     ? `${jobs.length} high-match roles surfaced from the latest scan.`
@@ -390,8 +426,8 @@ function renderRecommendedJobs() {
 
 
 function filteredJobs() {
-  const query = dom.jobsSearchInput.value.trim().toLowerCase();
-  const statusFilter = dom.jobsStatusFilter.value;
+  const query = dom.jobsSearchInput?.value?.trim().toLowerCase() || "";
+  const statusFilter = dom.jobsStatusFilter?.value || "";
   return state.jobs.filter(job => {
     const haystack = [job.company, job.role, job.notes, job.field, job.location, job.job_summary].join(" ").toLowerCase();
     const matchesQuery = !query || haystack.includes(query);
@@ -401,6 +437,7 @@ function filteredJobs() {
 }
 
 function renderJobsList() {
+  if (!dom.jobsList) return;
   const jobs = filteredJobs();
   if (!jobs.length) {
     const hasJobs = state.jobs.length > 0;
@@ -470,6 +507,7 @@ function renderJobsList() {
 
 function openJobDetailsModal(job, trigger = null) {
   if (!job || !dom.jobDetailsModal) return;
+  state.activeJobDetails = job;
   lastModalTrigger = trigger || document.activeElement;
   const title = [job.company, job.role].filter(Boolean).join(" — ") || "Job details";
   dom.jobDetailsTitle.textContent = title;
@@ -514,11 +552,13 @@ function closeJobDetailsModal() {
 }
 
 function renderProfile() {
+  if (!dom.resumeBox && !dom.parsedProfileOutput) return;
   renderParsedProfile(state.parsedProfile || {});
   setResumeMeta({});
 }
 
 function renderSettings() {
+  if (!dom.syncWindow) return;
   dom.syncWindow.value = String(state.settings.sync_window_hours || 24);
   dom.preferredLocation.value = state.settings.preferred_location || "";
   dom.preferredLocations.value = (state.settings.preferred_locations || []).join("\n");
@@ -530,6 +570,7 @@ function renderSettings() {
 }
 
 function renderDocuments() {
+  if (!dom.documentsList) return;
   dom.documentsList.innerHTML = state.documents.length
     ? state.documents.map(doc => `
       <div class="document-card">
@@ -547,6 +588,7 @@ function renderDocuments() {
 }
 
 function renderChatHistory() {
+  if (!dom.chatMessages) return;
   if (!state.chatAvailable) {
     dom.chatMessages.innerHTML = emptyState("Assistant unavailable", "The chat backend is not connected right now, so the UI will not fake responses or actions.");
     return;
@@ -563,10 +605,12 @@ function renderChatHistory() {
 }
 
 function populateEmailJobDropdown() {
+  if (!dom.emailJobLink) return;
   dom.emailJobLink.innerHTML = `<option value="">Optionally link to a job</option>${state.jobs.map(job => `<option value="${job.id}">${job.company} — ${job.role}</option>`).join("")}`;
 }
 
 function renderParseResults() {
+  if (!dom.parseLoading || !dom.parseError || !dom.parseEmpty || !dom.parseJobResults || !dom.generatedOutput) return;
   const intake = state.currentIntake;
   dom.parseLoading.classList.toggle("hidden", !state.parsing);
   dom.parseError.classList.toggle("hidden", !state.parseError);
@@ -605,7 +649,7 @@ function renderParseResults() {
 
 async function loadDashboard() {
   state.dashboard = await api("/api/dashboard/simple");
-  dom.gmailSyncStatus.textContent = state.dashboard.gmail_sync?.message || "Not configured";
+  if (dom.gmailSyncStatus) dom.gmailSyncStatus.textContent = state.dashboard.gmail_sync?.message || "Not configured";
   renderDashboard();
 }
 
@@ -622,7 +666,7 @@ async function loadRecommendedJobs() {
 
 async function loadProfile() {
   const profile = await api("/api/profile");
-  dom.resumeBox.value = profile.resume_text || "";
+  if (dom.resumeBox) dom.resumeBox.value = profile.resume_text || "";
   state.parsedProfile = profile.parsed_profile || {};
   state.chatHistory = profile.chat_history || [];
   state.chatAvailable = true;
@@ -632,14 +676,16 @@ async function loadProfile() {
   setResumeMeta(profile);
   renderChatHistory();
   renderDocuments();
-  const keywords = await api("/api/keywords");
-  dom.keywordBox.value = (keywords.keywords || []).join("\n");
+  if (dom.keywordBox) {
+    const keywords = await api("/api/keywords");
+    dom.keywordBox.value = (keywords.keywords || []).join("\n");
+  }
 }
 
 async function loadSettings() {
   const data = await api("/api/settings");
   state.settings = data.settings || {};
-  dom.gmailSyncStatus.textContent = data.gmail_sync?.message || "Not configured";
+  if (dom.gmailSyncStatus) dom.gmailSyncStatus.textContent = data.gmail_sync?.message || "Not configured";
   renderSettings();
 }
 
@@ -666,7 +712,7 @@ async function checkAuth() {
 
 async function handleLogin(event) {
   event.preventDefault();
-  dom.loginError.classList.add("hidden");
+  dom.loginError?.classList.add("hidden");
   try {
     await api("/api/auth/login", {
       method: "POST",
@@ -677,8 +723,10 @@ async function handleLogin(event) {
     setSection("tracker");
     showToast("Logged in");
   } catch (error) {
-    dom.loginError.textContent = error.message;
-    dom.loginError.classList.remove("hidden");
+    if (dom.loginError) {
+      dom.loginError.textContent = error.message;
+      dom.loginError.classList.remove("hidden");
+    }
   }
 }
 
@@ -715,7 +763,7 @@ async function handleJobListClick(event) {
   const row = event.target.closest("[data-job-id]");
   if (!row) return;
   if (event.target.closest('[data-action="open-details"]')) {
-    const job = state.jobs.find(item => item.id === row.dataset.jobId);
+    const job = state.jobs.find(item => jobIdEquals(item.id, row.dataset.jobId));
     openJobDetailsModal(job, event.target.closest('[data-action="open-details"]'));
     return;
   }
@@ -1075,52 +1123,52 @@ async function handleDocumentDownload() {
 }
 
 function attachEvents() {
-  dom.loginForm.addEventListener("submit", handleLogin);
-  dom.logoutBtn.addEventListener("click", handleLogout);
+  dom.loginForm?.addEventListener("submit", handleLogin);
+  dom.logoutBtn?.addEventListener("click", handleLogout);
   dom.navButtons.forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
   dom.mobileNavToggle?.addEventListener("click", toggleSidebar);
   dom.sidebarBackdrop?.addEventListener("click", closeSidebar);
-  dom.refreshDashboardBtn.addEventListener("click", () => Promise.all([loadDashboard()]));
-  dom.jobsRefreshBtn.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
-  dom.discoverJobsBtn.addEventListener("click", handleDiscoverJobs);
+  dom.refreshDashboardBtn?.addEventListener("click", () => Promise.all([loadDashboard()]));
+  dom.jobsRefreshBtn?.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
+  dom.discoverJobsBtn?.addEventListener("click", handleDiscoverJobs);
   const openAddJobModal = () => dom.addJobModal.classList.remove("hidden");
-  dom.openAddJobBtn.addEventListener("click", openAddJobModal);
-  dom.openAddJobJobsBtn.addEventListener("click", openAddJobModal);
-  dom.closeAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
-  dom.cancelAddJobModal.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
-  dom.addJobForm.addEventListener("submit", handleAddJob);
+  dom.openAddJobBtn?.addEventListener("click", openAddJobModal);
+  dom.openAddJobJobsBtn?.addEventListener("click", openAddJobModal);
+  dom.closeAddJobModal?.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
+  dom.cancelAddJobModal?.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
+  dom.addJobForm?.addEventListener("submit", handleAddJob);
   dom.openParseJobBtns.forEach(button => button && button.addEventListener("click", openParseModal));
-  dom.closeParseJobModal.addEventListener("click", closeParseModal);
-  dom.closeJobDetailsModal.addEventListener("click", closeJobDetailsModal);
-  dom.parseJobBtn.addEventListener("click", handleParseJob);
-  dom.jobActions.addEventListener("click", handleParsedActionClick);
-  dom.jobsSearchInput.addEventListener("input", renderJobsList);
-  dom.jobsStatusFilter.addEventListener("change", renderJobsList);
-  dom.jobsList.addEventListener("click", handleJobListClick);
-  dom.jobsList.addEventListener("change", handleJobListChange);
-  dom.documentsList.addEventListener("click", handleDocumentsClick);
-  dom.analyzeResumeBtn.addEventListener("click", handleResumeAnalyze);
-  dom.uploadResumeBtn.addEventListener("click", () => dom.resumeUploadInput.click());
-  dom.replaceResumeBtn.addEventListener("click", () => dom.resumeUploadInput.click());
-  dom.resumeUploadInput.addEventListener("change", handleResumeUpload);
-  dom.saveResumeBtn.addEventListener("click", handleResumeSave);
-  dom.downloadResumeBtn.addEventListener("click", handleResumeDownload);
-  dom.saveKeywordsBtn.addEventListener("click", handleKeywordsSave);
-  dom.saveSettingsBtn.addEventListener("click", handleSettingsSave);
-  dom.parseEmailBtn.addEventListener("click", handleEmailParse);
-  dom.recommendedJobsList.addEventListener("click", handleRecommendedJobClick);
-  dom.chatForm.addEventListener("submit", handleChat);
-  dom.closeDocumentEditorModal.addEventListener("click", closeDocumentEditorModal);
-  dom.saveDocumentBtn.addEventListener("click", handleDocumentSave);
-  dom.downloadDocumentPdfBtn.addEventListener("click", handleDocumentDownload);
-  dom.addJobModal.addEventListener("click", event => { if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden"); });
-  dom.parseJobModal.addEventListener("click", event => { if (event.target === dom.parseJobModal) closeParseModal(); });
-  dom.jobDetailsModal.addEventListener("click", event => { if (event.target === dom.jobDetailsModal) closeJobDetailsModal(); });
+  dom.closeParseJobModal?.addEventListener("click", closeParseModal);
+  dom.closeJobDetailsModal?.addEventListener("click", closeJobDetailsModal);
+  dom.parseJobBtn?.addEventListener("click", handleParseJob);
+  dom.jobActions?.addEventListener("click", handleParsedActionClick);
+  dom.jobsSearchInput?.addEventListener("input", renderJobsList);
+  dom.jobsStatusFilter?.addEventListener("change", renderJobsList);
+  dom.jobsList?.addEventListener("click", handleJobListClick);
+  dom.jobsList?.addEventListener("change", handleJobListChange);
+  dom.documentsList?.addEventListener("click", handleDocumentsClick);
+  dom.analyzeResumeBtn?.addEventListener("click", handleResumeAnalyze);
+  dom.uploadResumeBtn?.addEventListener("click", () => dom.resumeUploadInput.click());
+  dom.replaceResumeBtn?.addEventListener("click", () => dom.resumeUploadInput.click());
+  dom.resumeUploadInput?.addEventListener("change", handleResumeUpload);
+  dom.saveResumeBtn?.addEventListener("click", handleResumeSave);
+  dom.downloadResumeBtn?.addEventListener("click", handleResumeDownload);
+  dom.saveKeywordsBtn?.addEventListener("click", handleKeywordsSave);
+  dom.saveSettingsBtn?.addEventListener("click", handleSettingsSave);
+  dom.parseEmailBtn?.addEventListener("click", handleEmailParse);
+  dom.recommendedJobsList?.addEventListener("click", handleRecommendedJobClick);
+  dom.chatForm?.addEventListener("submit", handleChat);
+  dom.closeDocumentEditorModal?.addEventListener("click", closeDocumentEditorModal);
+  dom.saveDocumentBtn?.addEventListener("click", handleDocumentSave);
+  dom.downloadDocumentPdfBtn?.addEventListener("click", handleDocumentDownload);
+  dom.addJobModal?.addEventListener("click", event => { if (event.target === dom.addJobModal) dom.addJobModal.classList.add("hidden"); });
+  dom.parseJobModal?.addEventListener("click", event => { if (event.target === dom.parseJobModal) closeParseModal(); });
+  dom.jobDetailsModal?.addEventListener("click", event => { if (event.target === dom.jobDetailsModal) closeJobDetailsModal(); });
   window.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
     if (document.body.classList.contains("sidebar-open")) closeSidebar();
-    if (!dom.jobDetailsModal.classList.contains("hidden")) closeJobDetailsModal();
-    if (!dom.parseJobModal.classList.contains("hidden")) closeParseModal();
+    if (dom.jobDetailsModal && !dom.jobDetailsModal.classList.contains("hidden")) closeJobDetailsModal();
+    if (dom.parseJobModal && !dom.parseJobModal.classList.contains("hidden")) closeParseModal();
   });
   window.addEventListener("resize", () => {
     if (!isMobileViewport()) closeSidebar();
