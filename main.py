@@ -7,7 +7,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import boto3
@@ -27,7 +27,7 @@ from pypdf import PdfReader
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
-from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text, create_engine, desc, inspect, select, text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text, create_engine, desc, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 APP_TITLE = "JobTracker Personal Career Assistant"
@@ -41,6 +41,12 @@ JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
 DASHBOARD_EMAIL = os.getenv("DASHBOARD_EMAIL", "").strip().lower()
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 DASHBOARD_PASSWORD_HASH = os.getenv("DASHBOARD_PASSWORD_HASH", "")
+BOOTSTRAP_ADMIN_EMAIL = os.getenv("BOOTSTRAP_ADMIN_EMAIL", DASHBOARD_EMAIL).strip().lower()
+BOOTSTRAP_ADMIN_PASSWORD = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", DASHBOARD_PASSWORD)
+BOOTSTRAP_ADMIN_PASSWORD_HASH = os.getenv("BOOTSTRAP_ADMIN_PASSWORD_HASH", DASHBOARD_PASSWORD_HASH)
+BOOTSTRAP_ADMIN_FULL_NAME = os.getenv("BOOTSTRAP_ADMIN_FULL_NAME", "Admin User").strip()
+AUTH_SEED_EMAILS = [email.strip().lower() for email in os.getenv("AUTH_SEED_EMAILS", "rugved261@gmail.com,akanshac0204@gmail.com").split(",") if email.strip()]
+AUTH_SEED_DEFAULT_PASSWORD = os.getenv("AUTH_SEED_DEFAULT_PASSWORD", "")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 NOVA_MODEL_ID = os.getenv("NOVA_MODEL_ID", "us.amazon.nova-lite-v1:0")
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
@@ -236,6 +242,14 @@ REQUIRED_COLUMNS = {
         "created_at": "TIMESTAMP WITH TIME ZONE",
         "updated_at": "TIMESTAMP WITH TIME ZONE",
     },
+    "users": {
+        "id": "INTEGER PRIMARY KEY",
+        "email": "VARCHAR(255)",
+        "password_hash": "VARCHAR(255)",
+        "full_name": "VARCHAR(255) DEFAULT ''",
+        "is_active": "BOOLEAN DEFAULT TRUE",
+        "created_at": "TIMESTAMP WITH TIME ZONE",
+    },
 }
 
 
@@ -379,6 +393,17 @@ class JobSearchRunRecord(TimestampMixin, Base):
     error_message: Mapped[str] = mapped_column(Text, default="")
 
 
+class UserRecord(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    full_name: Mapped[str] = mapped_column(String(255), default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 engine = None
 SessionLocal = None
 
@@ -386,6 +411,16 @@ SessionLocal = None
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    full_name: str
+    is_active: bool
+    created_at: datetime
 
 
 class JobCreate(BaseModel):
@@ -597,10 +632,6 @@ def require_env() -> None:
         missing.append("DATABASE_URL")
     if not JWT_SECRET:
         missing.append("JWT_SECRET")
-    if not DASHBOARD_EMAIL:
-        missing.append("DASHBOARD_EMAIL")
-    if not (DASHBOARD_PASSWORD or DASHBOARD_PASSWORD_HASH):
-        missing.append("DASHBOARD_PASSWORD or DASHBOARD_PASSWORD_HASH")
     if missing:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
 
@@ -627,6 +658,86 @@ def safe_json_value(value: Any, fallback: Any) -> Any:
     if isinstance(fallback, list):
         return value if isinstance(value, list) else deep_copy_default(fallback)
     return value
+
+
+def get_bootstrap_credentials() -> Optional[Tuple[str, str, str]]:
+    email = BOOTSTRAP_ADMIN_EMAIL or DASHBOARD_EMAIL
+    password_hash = BOOTSTRAP_ADMIN_PASSWORD_HASH or DASHBOARD_PASSWORD_HASH
+    if not password_hash and (BOOTSTRAP_ADMIN_PASSWORD or DASHBOARD_PASSWORD):
+        password_hash = pwd_context.hash(BOOTSTRAP_ADMIN_PASSWORD or DASHBOARD_PASSWORD)
+    if not email or not password_hash:
+        return None
+    return email, password_hash, BOOTSTRAP_ADMIN_FULL_NAME or "Admin User"
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, password_hash: str) -> bool:
+    try:
+        return pwd_context.verify(plain_password, password_hash)
+    except (ValueError, TypeError):
+        return False
+
+
+class UserService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_email(self, email: str) -> Optional[UserRecord]:
+        normalized = (email or "").strip().lower()
+        if not normalized:
+            return None
+        return self.db.scalar(select(UserRecord).where(func.lower(UserRecord.email) == normalized))
+
+    def authenticate(self, email: str, password: str) -> Optional[UserRecord]:
+        user = self.get_by_email(email)
+        if not user or not user.is_active:
+            return None
+        return user if verify_password(password, user.password_hash) else None
+
+    def create_user(self, email: str, password_hash: str, full_name: str = "", is_active: bool = True) -> UserRecord:
+        normalized = (email or "").strip().lower()
+        if not normalized:
+            raise ValueError("Email is required")
+        existing = self.get_by_email(normalized)
+        if existing:
+            existing.password_hash = password_hash
+            existing.full_name = full_name or existing.full_name
+            existing.is_active = is_active
+            self.db.add(existing)
+            self.db.commit()
+            self.db.refresh(existing)
+            return existing
+        user = UserRecord(email=normalized, password_hash=password_hash, full_name=full_name or "", is_active=is_active)
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def ensure_bootstrap_admin(self) -> Optional[UserRecord]:
+        if self.db.scalar(select(func.count()).select_from(UserRecord)):
+            return None
+        bootstrap = get_bootstrap_credentials()
+        if not bootstrap:
+            logger.warning("Users table is empty and no bootstrap admin credentials were provided.")
+            return None
+        email, password_hash, full_name = bootstrap
+        logger.info("Bootstrapping initial admin user for %s", email)
+        return self.create_user(email=email, password_hash=password_hash, full_name=full_name, is_active=True)
+
+    def seed_users(self, emails: List[str], default_password: str) -> List[UserRecord]:
+        if not default_password:
+            raise ValueError("AUTH_SEED_DEFAULT_PASSWORD is required to seed users safely")
+        created = []
+        for email in emails:
+            normalized = (email or "").strip().lower()
+            if not normalized or self.get_by_email(normalized):
+                continue
+            full_name = normalized.split("@")[0].replace(".", " ").replace("_", " ").title()
+            created.append(self.create_user(normalized, password_hash=hash_password(default_password), full_name=full_name, is_active=True))
+        return created
 
 
 def ensure_schema_compatibility() -> None:
@@ -1657,6 +1768,12 @@ def initialize_database() -> None:
     ensure_schema_compatibility()
     with SessionLocal() as db:
         StateService(db).ensure_defaults()
+        user_service = UserService(db)
+        user_service.ensure_bootstrap_admin()
+        if AUTH_SEED_DEFAULT_PASSWORD and AUTH_SEED_EMAILS:
+            seeded = user_service.seed_users(AUTH_SEED_EMAILS, AUTH_SEED_DEFAULT_PASSWORD)
+            if seeded:
+                logger.info("Seeded %s additional auth users", len(seeded))
 
 
 @asynccontextmanager
@@ -1685,18 +1802,9 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def verify_password(plain_password: str) -> bool:
-    if DASHBOARD_PASSWORD_HASH:
-        try:
-            return pwd_context.verify(plain_password, DASHBOARD_PASSWORD_HASH)
-        except (ValueError, TypeError):
-            return False
-    return plain_password == DASHBOARD_PASSWORD
-
-
-def create_access_token(email: str) -> str:
+def create_access_token(user: UserRecord) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS)
-    return jwt.encode({"sub": email, "exp": expire, "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode({"sub": user.email, "user_id": user.id, "exp": expire, "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def decode_token(token: str) -> Dict[str, Any]:
@@ -1710,13 +1818,31 @@ def get_token_from_request(request: Request, credentials: Optional[HTTPAuthoriza
     return request.cookies.get(COOKIE_NAME) or (credentials.credentials if credentials and credentials.scheme.lower() == "bearer" else None)
 
 
-def require_auth(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)) -> Dict[str, Any]:
+def require_auth(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     token = get_token_from_request(request, credentials)
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
     payload = decode_token(token)
-    if payload.get("sub", "").lower() != DASHBOARD_EMAIL:
+    email = (payload.get("sub") or "").strip().lower()
+    user_id = payload.get("user_id")
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    user = None
+    if user_id is not None:
+        user = db.get(UserRecord, user_id)
+        if user and user.email.lower() != email:
+            user = None
+    if user is None:
+        user = UserService(db).get_by_email(email)
+    if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Unauthorized user")
+    payload["user_id"] = user.id
+    payload["sub"] = user.email
+    payload["full_name"] = user.full_name
     return payload
 
 
@@ -1758,13 +1884,13 @@ def robots():
 
 
 @app.post("/api/auth/login")
-def login(payload: LoginRequest, response: Response):
-    email = payload.email.strip().lower()
-    if email != DASHBOARD_EMAIL or not verify_password(payload.password):
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    user = UserService(db).authenticate(payload.email, payload.password)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    token = create_access_token(email)
+    token = create_access_token(user)
     response.set_cookie(key=COOKIE_NAME, value=token, httponly=True, secure=IS_PRODUCTION, samesite="lax", max_age=JWT_EXPIRE_HOURS * 3600, path="/")
-    return {"ok": True, "email": email}
+    return {"ok": True, "email": user.email, "full_name": user.full_name}
 
 
 @app.post("/api/auth/logout")
@@ -1775,7 +1901,7 @@ def logout(response: Response):
 
 @app.get("/api/auth/me")
 def auth_me(user: Dict[str, Any] = Depends(require_auth)):
-    return {"authenticated": True, "email": user["sub"]}
+    return {"authenticated": True, "email": user["sub"], "full_name": user.get("full_name", "") or ""}
 
 
 @app.get("/api/dashboard/simple")
