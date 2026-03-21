@@ -517,13 +517,95 @@
           <p class="eyebrow">Application details</p>
           <h3 id="job-details-title">Job details</h3>
         </div>
-        <button id="close-job-details-modal" class="btn btn-ghost btn-icon-only" type="button"><i data-lucide="x"></i></button>
+        <div class="inline-actions">
+          <button id="edit-job-details-btn" class="btn btn-secondary btn-icon-only" type="button" aria-label="Edit job"><i data-lucide="edit-3"></i></button>
+          <button id="close-job-details-modal" class="btn btn-ghost btn-icon-only" type="button"><i data-lucide="x"></i></button>
+        </div>
       </div>
-      <div class="inline-actions modal-badges mobile-inline-actions">
-        <span id="job-details-status" class="chip">Not specified</span>
-        <span id="job-details-match" class="chip">Match not available</span>
+      
+      <div id="job-details-view-mode" class="modal-scroll-content">
+        <div class="inline-actions modal-badges mobile-inline-actions">
+          <span id="job-details-status" class="chip">Not specified</span>
+          <span id="job-details-match" class="chip">Match not available</span>
+        </div>
+        <div id="job-details-grid" class="job-details-grid"></div>
       </div>
-      <div id="job-details-grid" class="job-details-grid modal-scroll-content"></div>
+
+      <form id="job-details-edit-form" class="stack-md modal-scroll-content hidden">
+        <div class="two-column mobile-stack-grid">
+          <div>
+            <label class="label" for="job-details-company">Company</label>
+            <input id="job-details-company" class="field" type="text" required />
+          </div>
+          <div>
+            <label class="label" for="job-details-role">Role</label>
+            <input id="job-details-role" class="field" type="text" required />
+          </div>
+        </div>
+        
+        <div class="two-column mobile-stack-grid">
+          <div>
+            <label class="label" for="job-details-status-select">Status</label>
+            <select id="job-details-status-select" class="field">
+              <option value="Wishlist">Wishlist</option>
+              <option value="Applied">Applied</option>
+              <option value="Interview">Interview</option>
+              <option value="Offered">Offered</option>
+              <option value="Accepted">Accepted</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Archived">Archived</option>
+              <option value="Later">Later</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="job-details-date">Date</label>
+            <input id="job-details-date" class="field" type="date" />
+          </div>
+        </div>
+
+        <div class="two-column mobile-stack-grid">
+          <div>
+            <label class="label" for="job-details-location">Location</label>
+            <input id="job-details-location" class="field" type="text" />
+          </div>
+          <div>
+            <label class="label" for="job-details-salary">Salary Range</label>
+            <input id="job-details-salary" class="field" type="text" />
+          </div>
+        </div>
+
+        <div class="two-column mobile-stack-grid">
+          <div>
+            <label class="label" for="job-details-sponsor">Sponsorship Info</label>
+            <input id="job-details-sponsor" class="field" type="text" />
+          </div>
+          <div>
+            <label class="label" for="job-details-match-score">Match Score (%)</label>
+            <input id="job-details-match-score" class="field" type="number" min="0" max="100" />
+          </div>
+        </div>
+
+        <div>
+          <label class="label" for="job-details-link">Job Link</label>
+          <input id="job-details-link" class="field" type="url" />
+        </div>
+
+        <div>
+          <label class="label" for="job-details-summary">Job Summary</label>
+          <textarea id="job-details-summary" class="field textarea-md"></textarea>
+        </div>
+
+        <div>
+          <label class="label" for="job-details-notes">Personal Notes</label>
+          <textarea id="job-details-notes" class="field textarea-md" placeholder="Drop interview links, contacts, or scratchpad notes here."></textarea>
+        </div>
+
+        <div class="inline-actions end mobile-inline-actions">
+          <button id="cancel-edit-job-btn" class="btn btn-ghost" type="button">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save Changes</button>
+        </div>
+      </form>
+
     </div>
   </div>
 
