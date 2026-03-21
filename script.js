@@ -23,6 +23,9 @@ const state = {
 const dom = {
   loginScreen: document.getElementById("login-screen"),
   appShell: document.getElementById("app-shell"),
+  sidebar: document.getElementById("sidebar"),
+  sidebarBackdrop: document.getElementById("sidebar-backdrop"),
+  mobileNavToggle: document.getElementById("mobile-nav-toggle"),
   loginForm: document.getElementById("login-form"),
   loginEmail: document.getElementById("login-email"),
   loginPassword: document.getElementById("login-password"),
@@ -137,6 +140,27 @@ const dom = {
 
 let lastModalTrigger = null;
 
+function isMobileViewport() {
+  return window.matchMedia("(max-width: 1100px)").matches;
+}
+
+function setSidebarOpen(isOpen) {
+  document.body.classList.toggle("sidebar-open", isOpen);
+  if (dom.sidebarBackdrop) dom.sidebarBackdrop.classList.toggle("hidden", !isOpen);
+  if (dom.mobileNavToggle) {
+    dom.mobileNavToggle.setAttribute("aria-expanded", String(isOpen));
+    dom.mobileNavToggle.setAttribute("aria-label", isOpen ? "Close navigation" : "Open navigation");
+  }
+}
+
+function closeSidebar() {
+  setSidebarOpen(false);
+}
+
+function toggleSidebar() {
+  setSidebarOpen(!document.body.classList.contains("sidebar-open"));
+}
+
 function showToast(message) {
   if (!dom.toast) return;
   dom.toast.textContent = message;
@@ -193,6 +217,7 @@ function emptyState(title, message = "") {
 }
 
 function showLogin() {
+  closeSidebar();
   dom.loginScreen.classList.remove("hidden");
   dom.appShell.classList.add("hidden");
 }
@@ -200,6 +225,7 @@ function showLogin() {
 function showApp() {
   dom.loginScreen.classList.add("hidden");
   dom.appShell.classList.remove("hidden");
+  if (!isMobileViewport()) closeSidebar();
 }
 
 function setSection(sectionId) {
@@ -209,6 +235,7 @@ function setSection(sectionId) {
     const active = Array.from(dom.navButtons).find(button => button.dataset.section === sectionId);
     dom.pageTitle.textContent = active ? active.textContent.trim() : "Tracker";
   }
+  if (isMobileViewport()) closeSidebar();
 }
 
 async function safeJSON(response) {
@@ -387,6 +414,34 @@ function renderJobsList() {
           <button class="btn btn-ghost" data-action="delete" type="button">Delete</button>
         </div>
       </div>
+      <article class="mobile-job-card" data-job-id="${job.id}">
+        <div class="mobile-job-card-header">
+          <button class="job-primary-button" data-action="open-details" type="button" aria-label="Open details for ${escapeHtml(safeText(job.company, "job"))}">
+            <strong>${safeText(job.company)}</strong>
+            <p class="muted">${safeText(job.role)}</p>
+          </button>
+          ${job.ai_match_score ? `<span class="chip">Match ${job.ai_match_score}%</span>` : `<span class="chip">Match —</span>`}
+        </div>
+        <div class="mobile-job-card-body">
+          <p class="muted job-summary-preview">${safeText(job.job_summary, "No summary saved")}</p>
+          <div class="mobile-job-meta">
+            <div class="mobile-job-meta-item">
+              <span>Status</span>
+              <select class="field job-status-select" data-action="status">
+                ${STATUS_ORDER.map(status => `<option value="${status}" ${job.status === status ? "selected" : ""}>${status}</option>`).join("")}
+              </select>
+            </div>
+            <div class="mobile-job-meta-item">
+              <span>Location</span>
+              <strong>${safeText(job.location)}</strong>
+            </div>
+          </div>
+          <div class="mobile-job-actions">
+            <button class="btn btn-secondary full-width" data-action="open-details" type="button">View details</button>
+            <button class="btn btn-ghost full-width" data-action="delete" type="button">Delete job</button>
+          </div>
+        </div>
+      </article>
     `).join("")}
   `;
 }
@@ -1001,6 +1056,8 @@ function attachEvents() {
   dom.loginForm.addEventListener("submit", handleLogin);
   dom.logoutBtn.addEventListener("click", handleLogout);
   dom.navButtons.forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
+  dom.mobileNavToggle?.addEventListener("click", toggleSidebar);
+  dom.sidebarBackdrop?.addEventListener("click", closeSidebar);
   dom.refreshDashboardBtn.addEventListener("click", () => Promise.all([loadDashboard()]));
   dom.jobsRefreshBtn.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
   dom.discoverJobsBtn.addEventListener("click", handleDiscoverJobs);
@@ -1039,8 +1096,12 @@ function attachEvents() {
   dom.jobDetailsModal.addEventListener("click", event => { if (event.target === dom.jobDetailsModal) closeJobDetailsModal(); });
   window.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
+    if (document.body.classList.contains("sidebar-open")) closeSidebar();
     if (!dom.jobDetailsModal.classList.contains("hidden")) closeJobDetailsModal();
     if (!dom.parseJobModal.classList.contains("hidden")) closeParseModal();
+  });
+  window.addEventListener("resize", () => {
+    if (!isMobileViewport()) closeSidebar();
   });
 }
 
