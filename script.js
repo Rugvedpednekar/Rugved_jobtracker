@@ -18,6 +18,7 @@ const state = {
   parsing: false,
   parseError: "",
   chatAvailable: true,
+  currentUser: null,
 };
 
 const dom = {
@@ -32,19 +33,24 @@ const dom = {
   loginError: document.getElementById("login-error"),
   toast: document.getElementById("toast"),
   pageTitle: document.getElementById("page-title"),
+  pageEyebrow: document.getElementById("page-eyebrow"),
+  pageSubtitle: document.getElementById("page-subtitle"),
+  greetingName: document.getElementById("greeting-name"),
+  sidebarUserName: document.getElementById("sidebar-user-name"),
+  sidebarUserEmail: document.getElementById("sidebar-user-email"),
+  sidebarAvatar: document.getElementById("sidebar-avatar"),
   navButtons: document.querySelectorAll(".nav-btn"),
   panels: document.querySelectorAll(".section-panel"),
   logoutBtn: document.getElementById("logout-btn"),
   refreshDashboardBtn: document.getElementById("refresh-dashboard-btn"),
   jobsRefreshBtn: document.getElementById("jobs-refresh-btn"),
   discoverJobsBtn: document.getElementById("discover-jobs-btn"),
-  openAddJobBtn: document.getElementById("open-add-job"),
-  openAddJobJobsBtn: document.getElementById("open-add-job-jobs"),
+  openAddJobBtns: Array.from(document.querySelectorAll("[data-open-add-job], #open-add-job, #open-add-job-jobs")),
   addJobModal: document.getElementById("add-job-modal"),
   addJobForm: document.getElementById("add-job-form"),
   closeAddJobModal: document.getElementById("close-add-job-modal"),
   cancelAddJobModal: document.getElementById("cancel-add-job-modal"),
-  openParseJobBtns: [document.getElementById("open-parse-job"), document.getElementById("open-parse-job-jobs")],
+  openParseJobBtns: Array.from(document.querySelectorAll("[data-open-parse-modal], #open-parse-job, #open-parse-job-jobs")),
   parseJobModal: document.getElementById("parse-job-modal"),
   closeParseJobModal: document.getElementById("close-parse-job-modal"),
   jobUrlInput: document.getElementById("job-url-input"),
@@ -220,8 +226,30 @@ function emptyState(title, message = "") {
   return `<div class="empty-state"><strong>${title}</strong>${message ? `<p>${message}</p>` : ""}</div>`;
 }
 
+
+function initialsForName(name = "") {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() || "")
+    .join("") || "JT";
+}
+
+function setCurrentUser(user = null) {
+  state.currentUser = user;
+  const fullName = safeText(user?.full_name?.trim(), "Your workspace");
+  const email = safeText(user?.email?.trim(), "Signed in");
+  const greeting = user?.full_name?.trim() || user?.email?.split("@")[0] || "there";
+  if (dom.sidebarUserName) dom.sidebarUserName.textContent = fullName;
+  if (dom.sidebarUserEmail) dom.sidebarUserEmail.textContent = email;
+  if (dom.greetingName) dom.greetingName.textContent = greeting;
+  if (dom.sidebarAvatar) dom.sidebarAvatar.textContent = initialsForName(user?.full_name || user?.email || "JT");
+}
+
 function showLogin() {
   closeSidebar();
+  setCurrentUser(null);
   dom.loginScreen.classList.remove("hidden");
   dom.appShell.classList.add("hidden");
 }
@@ -229,7 +257,7 @@ function showLogin() {
 function showApp() {
   dom.loginScreen.classList.add("hidden");
   dom.appShell.classList.remove("hidden");
-  if (!isMobileViewport()) closeSidebar();
+  closeSidebar();
 }
 
 function openDocumentEditorModal() {
@@ -257,9 +285,12 @@ documentEditorModal?.addEventListener("click", (e) => {
 function setSection(sectionId) {
   dom.panels.forEach(panel => panel.classList.toggle("hidden", panel.id !== sectionId));
   dom.navButtons.forEach(button => button.classList.toggle("active", button.dataset.section === sectionId));
-  if (dom.pageTitle) {
-    const active = Array.from(dom.navButtons).find(button => button.dataset.section === sectionId);
-    dom.pageTitle.textContent = active ? active.textContent.trim() : "Tracker";
+  const active = Array.from(dom.navButtons).find(button => button.dataset.section === sectionId);
+  if (dom.pageTitle) dom.pageTitle.textContent = active ? active.textContent.trim() : "Tracker";
+  if (dom.pageEyebrow) dom.pageEyebrow.textContent = sectionId === "tracker" ? "Overview" : "Workspace";
+  if (dom.pageSubtitle) {
+    const greeting = state.currentUser?.full_name?.trim() || state.currentUser?.email?.split("@")[0] || "there";
+    dom.pageSubtitle.textContent = `Welcome back, ${greeting}. ${sectionId === "tracker" ? "Your dashboard is loaded from live account data." : "Everything shown here comes from your private account data."}`;
   }
   if (isMobileViewport()) closeSidebar();
 }
@@ -702,7 +733,8 @@ async function loadAllData() {
 
 async function checkAuth() {
   try {
-    await api("/api/auth/me");
+    const me = await api("/api/auth/me");
+    setCurrentUser(me);
     showApp();
     await loadAllData();
   } catch {
@@ -714,10 +746,11 @@ async function handleLogin(event) {
   event.preventDefault();
   dom.loginError?.classList.add("hidden");
   try {
-    await api("/api/auth/login", {
+    const auth = await api("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email: dom.loginEmail.value.trim(), password: dom.loginPassword.value })
     });
+    setCurrentUser(auth);
     showApp();
     await loadAllData();
     setSection("tracker");
@@ -1132,8 +1165,7 @@ function attachEvents() {
   dom.jobsRefreshBtn?.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
   dom.discoverJobsBtn?.addEventListener("click", handleDiscoverJobs);
   const openAddJobModal = () => dom.addJobModal.classList.remove("hidden");
-  dom.openAddJobBtn?.addEventListener("click", openAddJobModal);
-  dom.openAddJobJobsBtn?.addEventListener("click", openAddJobModal);
+  dom.openAddJobBtns.forEach(button => button?.addEventListener("click", openAddJobModal));
   dom.closeAddJobModal?.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
   dom.cancelAddJobModal?.addEventListener("click", () => dom.addJobModal.classList.add("hidden"));
   dom.addJobForm?.addEventListener("submit", handleAddJob);
