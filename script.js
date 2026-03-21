@@ -273,28 +273,26 @@ function setCurrentUser(user = null) {
 function showLogin() {
   closeSidebar();
   setCurrentUser(null);
-  dom.loginScreen.classList.remove("hidden");
-  dom.appShell.classList.add("hidden");
+  if(dom.loginScreen) dom.loginScreen.classList.remove("hidden");
+  if(dom.appShell) dom.appShell.classList.add("hidden");
 }
 
 function showApp() {
-  dom.loginScreen.classList.add("hidden");
-  dom.appShell.classList.remove("hidden");
+  if(dom.loginScreen) dom.loginScreen.classList.add("hidden");
+  if(dom.appShell) dom.appShell.classList.remove("hidden");
   closeSidebar();
 }
 
 function openDocumentEditorModal() {
-  const modal = document.getElementById("document-editor-modal");
-  if (!modal) return;
-  modal.classList.remove("hidden");
-  modal.setAttribute("aria-hidden", "false");
+  if (!dom.documentEditorModal) return;
+  dom.documentEditorModal.classList.remove("hidden");
+  dom.documentEditorModal.setAttribute("aria-hidden", "false");
 }
 
 function closeDocumentEditorModal() {
-  const modal = document.getElementById("document-editor-modal");
-  if (!modal) return;
-  modal.classList.add("hidden");
-  modal.setAttribute("aria-hidden", "true");
+  if (!dom.documentEditorModal) return;
+  dom.documentEditorModal.classList.add("hidden");
+  dom.documentEditorModal.setAttribute("aria-hidden", "true");
 }
 
 function setSection(sectionId) {
@@ -423,12 +421,15 @@ function renderDashboard() {
   if (dom.interviewCount) dom.interviewCount.textContent = stats.interview_count || 0;
   if (dom.offeredCount) dom.offeredCount.textContent = stats.offered_count || 0;
   if (dom.acceptedCount) dom.acceptedCount.textContent = stats.accepted_count || 0;
+  
+  // Safe checks for badges
   if (dom.wishlistBadge) dom.wishlistBadge.textContent = stats.wishlist_count || 0;
   if (dom.appliedBadge) dom.appliedBadge.textContent = stats.applied_count || 0;
   if (dom.interviewBadge) dom.interviewBadge.textContent = stats.interview_count || 0;
   if (dom.offeredBadge) dom.offeredBadge.textContent = stats.offered_count || 0;
   if (dom.acceptedBadge) dom.acceptedBadge.textContent = stats.accepted_count || 0;
   if (dom.laterBadge) dom.laterBadge.textContent = stats.later_count || 0;
+  
   renderBoardColumn(dom.wishlistColumn, data.columns?.Wishlist || [], "Wishlist");
   renderBoardColumn(dom.appliedColumn, data.columns?.Applied || [], "Applied");
   renderBoardColumn(dom.interviewColumn, data.columns?.Interview || [], "Interview");
@@ -439,15 +440,25 @@ function renderDashboard() {
   const briefing = data.daily_briefing || {};
   if (dom.briefingSummary) dom.briefingSummary.textContent = briefing.summary || "No briefing available yet.";
   if (dom.dailyBriefingText) dom.dailyBriefingText.textContent = briefing.summary || "No briefing available yet.";
-  if (dom.followupList) dom.followupList.innerHTML = (briefing.follow_up_suggestions || []).length
-    ? briefing.follow_up_suggestions.map(item => `<div class="list-item">${item}</div>`).join("")
-    : emptyState("No follow-ups yet", "Your actual reminders will appear here after activity is recorded.");
-  if (dom.focusList) dom.focusList.innerHTML = (briefing.focus_today || []).length
-    ? briefing.focus_today.map(item => `<div class="list-item">${item}</div>`).join("")
-    : emptyState("No focus items yet", "Once applications move or become stale, the highest-priority next steps will appear here.");
-  if (dom.recentIntakes) dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
-    ? data.recent_intakes.map(item => `<div class="list-item"><strong>${safeText(item.company)}</strong><p class="muted">${safeText(item.role)} • ${safeText(item.location, "Location pending")}</p></div>`).join("")
-    : emptyState("No parsed jobs yet", "Parsed job links will appear here after successful intake.");
+  
+  if (dom.followupList) {
+      dom.followupList.innerHTML = (briefing.follow_up_suggestions || []).length
+        ? briefing.follow_up_suggestions.map(item => `<div class="list-item">${item}</div>`).join("")
+        : emptyState("No follow-ups yet", "Your actual reminders will appear here after activity is recorded.");
+  }
+  
+  if (dom.focusList) {
+      dom.focusList.innerHTML = (briefing.focus_today || []).length
+        ? briefing.focus_today.map(item => `<div class="list-item">${item}</div>`).join("")
+        : emptyState("No focus items yet", "Once applications move or become stale, the highest-priority next steps will appear here.");
+  }
+  
+  if (dom.recentIntakes) {
+      dom.recentIntakes.innerHTML = (data.recent_intakes || []).length
+        ? data.recent_intakes.map(item => `<div class="list-item"><strong>${safeText(item.company)}</strong><p class="muted">${safeText(item.role)} • ${safeText(item.location, "Location pending")}</p></div>`).join("")
+        : emptyState("No parsed jobs yet", "Parsed job links will appear here after successful intake.");
+  }
+  
   if (data.recommended_today) {
     state.recommendedJobs = data.recommended_today;
   }
@@ -543,15 +554,16 @@ function renderJobsList() {
   `;
 }
 
-// Toggles the view between read-only and edit form
 function toggleJobDetailsEditMode(editMode) {
   state.jobDetailsEditMode = editMode;
-  if (editMode) {
-    dom.jobDetailsViewMode.classList.add("hidden");
-    dom.jobDetailsEditForm.classList.remove("hidden");
-  } else {
-    dom.jobDetailsViewMode.classList.remove("hidden");
-    dom.jobDetailsEditForm.classList.add("hidden");
+  if(dom.jobDetailsViewMode && dom.jobDetailsEditForm) {
+      if (editMode) {
+        dom.jobDetailsViewMode.classList.add("hidden");
+        dom.jobDetailsEditForm.classList.remove("hidden");
+      } else {
+        dom.jobDetailsViewMode.classList.remove("hidden");
+        dom.jobDetailsEditForm.classList.add("hidden");
+      }
   }
 }
 
@@ -560,47 +572,45 @@ function openJobDetailsModal(job, trigger = null) {
   state.activeJobDetails = job;
   lastModalTrigger = trigger || document.activeElement;
   
-  // Fill Header
-  const title = [job.company, job.role].filter(Boolean).join(" — ") || "Job details";
-  dom.jobDetailsTitle.textContent = title;
-  dom.jobDetailsStatus.textContent = safeText(job.status, "Not specified");
-  dom.jobDetailsMatch.textContent = job.ai_match_score ? `Match ${job.ai_match_score}%` : "Match not available";
+  if (dom.jobDetailsTitle) dom.jobDetailsTitle.textContent = [job.company, job.role].filter(Boolean).join(" — ") || "Job details";
+  if (dom.jobDetailsStatus) dom.jobDetailsStatus.textContent = safeText(job.status, "Not specified");
+  if (dom.jobDetailsMatch) dom.jobDetailsMatch.textContent = job.ai_match_score ? `Match ${job.ai_match_score}%` : "Match not available";
   
-  // Fill Read Only View
-  const cards = [
-    ["Company name", renderDetailValue(job.company, "Not specified")],
-    ["Role title", renderDetailValue(job.role, "Not specified")],
-    ["Location", renderDetailValue(job.location, "Not specified")],
-    ["Salary", renderDetailValue(job.salary, "Not specified")],
-    ["Sponsorship info", renderDetailValue(job.sponsor || job.sponsorship, "Not specified")],
-    ["Job link", renderDetailLink(job.link, "Not specified")],
-    ["Skills", renderDetailList(job.skills, "No skills parsed"), "full-span"],
-    ["Notes", renderDetailValue(job.notes, "No notes added"), "full-span"],
-    ["Summary / parsed description", renderDetailValue(job.job_summary, "Not specified"), "full-span"]
-  ];
-  dom.jobDetailsGrid.innerHTML = cards.map(([label, valueHtml, span]) => `
-    <div class="panel stack-md${span ? ` ${span}` : ""}">
-      <div class="label">${label}</div>
-      ${valueHtml}
-    </div>
-  `).join("");
+  if (dom.jobDetailsGrid) {
+      const cards = [
+        ["Company name", renderDetailValue(job.company, "Not specified")],
+        ["Role title", renderDetailValue(job.role, "Not specified")],
+        ["Location", renderDetailValue(job.location, "Not specified")],
+        ["Salary", renderDetailValue(job.salary, "Not specified")],
+        ["Sponsorship info", renderDetailValue(job.sponsor || job.sponsorship, "Not specified")],
+        ["Job link", renderDetailLink(job.link, "Not specified")],
+        ["Skills", renderDetailList(job.skills, "No skills parsed"), "full-span"],
+        ["Notes", renderDetailValue(job.notes, "No notes added"), "full-span"],
+        ["Summary / parsed description", renderDetailValue(job.job_summary, "Not specified"), "full-span"]
+      ];
+      dom.jobDetailsGrid.innerHTML = cards.map(([label, valueHtml, span]) => `
+        <div class="panel stack-md${span ? ` ${span}` : ""}">
+          <div class="label">${label}</div>
+          ${valueHtml}
+        </div>
+      `).join("");
+  }
   
-  // Fill Edit Form Inputs
   if(dom.jobDetailsCompany) {
     dom.jobDetailsCompany.value = job.company || "";
     dom.jobDetailsRole.value = job.role || "";
-    dom.jobDetailsStatusSelect.value = job.status || "Applied";
-    dom.jobDetailsDate.value = job.date || "";
-    dom.jobDetailsLocation.value = job.location || "";
-    dom.jobDetailsSalary.value = job.salary || "";
-    dom.jobDetailsSponsor.value = job.sponsor || job.sponsorship || "";
-    dom.jobDetailsMatchScore.value = job.ai_match_score || "";
-    dom.jobDetailsLink.value = job.link || "";
-    dom.jobDetailsSummary.value = job.job_summary || "";
-    dom.jobDetailsNotes.value = job.notes || "";
+    if(dom.jobDetailsStatusSelect) dom.jobDetailsStatusSelect.value = job.status || "Applied";
+    if(dom.jobDetailsDate) dom.jobDetailsDate.value = job.date || "";
+    if(dom.jobDetailsLocation) dom.jobDetailsLocation.value = job.location || "";
+    if(dom.jobDetailsSalary) dom.jobDetailsSalary.value = job.salary || "";
+    if(dom.jobDetailsSponsor) dom.jobDetailsSponsor.value = job.sponsor || job.sponsorship || "";
+    if(dom.jobDetailsMatchScore) dom.jobDetailsMatchScore.value = job.ai_match_score || "";
+    if(dom.jobDetailsLink) dom.jobDetailsLink.value = job.link || "";
+    if(dom.jobDetailsSummary) dom.jobDetailsSummary.value = job.job_summary || "";
+    if(dom.jobDetailsNotes) dom.jobDetailsNotes.value = job.notes || "";
   }
 
-  toggleJobDetailsEditMode(false); // Reset back to view mode every time it opens
+  toggleJobDetailsEditMode(false);
   dom.jobDetailsModal.classList.remove("hidden");
   dom.jobDetailsModal.setAttribute("aria-hidden", "false");
 }
@@ -671,9 +681,13 @@ function populateEmailJobDropdown() {
   dom.emailJobLink.innerHTML = `<option value="">Optionally link to a job</option>${state.jobs.map(job => `<option value="${job.id}">${job.company} — ${job.role}</option>`).join("")}`;
 }
 
+// -------------------------------------------------------------
+// THIS IS THE CRITICAL FIX: SAFE DOM CHECKS
+// -------------------------------------------------------------
 function renderParseResults() {
   if (!dom.parseLoading || !dom.parseError || !dom.parseEmpty || !dom.parseJobResults || !dom.generatedOutput) return;
   const intake = state.currentIntake;
+  
   dom.parseLoading.classList.toggle("hidden", !state.parsing);
   dom.parseError.classList.toggle("hidden", !state.parseError);
   dom.parseError.textContent = state.parseError || "";
@@ -690,13 +704,17 @@ function renderParseResults() {
   const match = intake.match_analysis || {};
   dom.parseJobResults.classList.remove("hidden");
   
-  dom.parsedCompany.textContent = safeText(parsed.company);
-  dom.parsedRole.textContent = safeText(parsed.role);
-  dom.parsedLocation.textContent = safeText(parsed.location);
-  dom.parsedMatchScore.textContent = match.score ? `${match.score}%` : "—";
+  // Safe updates to text fields
+  if (dom.parsedCompany) dom.parsedCompany.textContent = safeText(parsed.company);
+  if (dom.parsedRole) dom.parsedRole.textContent = safeText(parsed.role);
+  if (dom.parsedLocation) dom.parsedLocation.textContent = safeText(parsed.location);
+  if (dom.parsedMatchScore) dom.parsedMatchScore.textContent = match.score ? `${match.score}%` : "—";
   
-  dom.parsedSkills.innerHTML = renderChips(parsed.skills || []);
-  dom.parsedMatchSummary.textContent = safeText(match.summary, "No match summary yet.");
+  if (dom.parsedSkills) dom.parsedSkills.innerHTML = renderChips(parsed.skills || []);
+  if (dom.parsedMatchSummary) dom.parsedMatchSummary.textContent = safeText(match.summary, "No match summary yet.");
+  
+  // Notice we safely skip parsedSummary because it was removed from index.html
+  if (dom.parsedSummary) dom.parsedSummary.textContent = safeText(parsed.summary);
   
   const tailoringNotes = match.tailoring_notes || [];
   if (dom.parsedTailoringNotes) {
@@ -706,11 +724,13 @@ function renderParseResults() {
       : "";
   }
 
-  dom.jobActions.innerHTML = (intake.suggested_actions || []).length ? (intake.suggested_actions || []).map(action => `
-    <button class="btn btn-secondary" type="button" data-action-id="${action.id}">
-      ${action.label}
-    </button>
-  `).join("") : emptyState("No actions available", "No follow-up actions returned by backend.");
+  if (dom.jobActions) {
+      dom.jobActions.innerHTML = (intake.suggested_actions || []).length ? (intake.suggested_actions || []).map(action => `
+        <button class="btn btn-secondary" type="button" data-action-id="${action.id}">
+          ${action.label}
+        </button>
+      `).join("") : emptyState("No actions available", "No follow-up actions returned by backend.");
+  }
 }
 
 async function loadDashboard() {
@@ -816,7 +836,7 @@ async function handleLogout() {
   state.activeDocument = null;
   state.currentUser = null;
 
-  dom.loginForm.reset();
+  if (dom.loginForm) dom.loginForm.reset();
   showLogin();
   showToast("Logged out");
 }
@@ -1037,14 +1057,18 @@ async function handleRecommendedJobClick(event) {
       body: JSON.stringify({ action: button.dataset.recommendedAction })
     });
     if (data.document?.content_text) {
-      dom.parseJobModal.classList.remove("hidden");
-      dom.generatedOutput.classList.remove("hidden");
-      dom.generatedOutput.innerHTML = `Generated <strong>${escapeHtml(data.document.name)}</strong>. Review and edit it before exporting.`;
+      if (dom.parseJobModal) dom.parseJobModal.classList.remove("hidden");
+      if (dom.generatedOutput) {
+        dom.generatedOutput.classList.remove("hidden");
+        dom.generatedOutput.innerHTML = `Generated <strong>${escapeHtml(data.document.name)}</strong>. Review and edit it before exporting.`;
+      }
       openDocumentEditor(data.document, `Tailored for ${card.querySelector("h3")?.textContent || "this role"}.`);
     } else if (data.match_analysis) {
-      dom.generatedOutput.classList.remove("hidden");
-      dom.generatedOutput.innerHTML = `<strong>Match summary</strong><p class="muted">${escapeHtml(data.match_analysis.summary || "Resume comparison ready.")}</p>`;
-      dom.parseJobModal.classList.remove("hidden");
+      if (dom.generatedOutput) {
+        dom.generatedOutput.classList.remove("hidden");
+        dom.generatedOutput.innerHTML = `<strong>Match summary</strong><p class="muted">${escapeHtml(data.match_analysis.summary || "Resume comparison ready.")}</p>`;
+      }
+      if (dom.parseJobModal) dom.parseJobModal.classList.remove("hidden");
     }
     await Promise.all([loadRecommendedJobs(), loadDashboard(), loadJobs(), loadDocuments()]);
     showToast("Recommended job action completed");
@@ -1059,8 +1083,8 @@ async function handleEmailParse() {
       method: "POST",
       body: JSON.stringify({ email_text: dom.emailParserInput.value, job_id: dom.emailJobLink.value || null })
     });
-    dom.parsedEmailStatus.textContent = data.parsed?.status || "-";
-    dom.parsedEmailReason.textContent = data.parsed?.reason || "-";
+    if (dom.parsedEmailStatus) dom.parsedEmailStatus.textContent = data.parsed?.status || "-";
+    if (dom.parsedEmailReason) dom.parsedEmailReason.textContent = data.parsed?.reason || "-";
     await Promise.all([loadDashboard(), loadJobs()]);
     showToast("Email parsed");
   } catch (error) {
@@ -1102,12 +1126,12 @@ function resetParseState() {
 
 function openParseModal() {
   resetParseState();
-  dom.parseJobModal.classList.remove("hidden");
-  dom.jobUrlInput.focus();
+  if(dom.parseJobModal) dom.parseJobModal.classList.remove("hidden");
+  if(dom.jobUrlInput) dom.jobUrlInput.focus();
 }
 
 function closeParseModal() {
-  dom.parseJobModal.classList.add("hidden");
+  if(dom.parseJobModal) dom.parseJobModal.classList.add("hidden");
 }
 
 async function handleParseJob() {
@@ -1142,8 +1166,10 @@ async function handleParsedActionClick(event) {
   if (!button || !state.currentIntake) return;
   const action = button.dataset.actionId;
   
-  dom.generatedOutput.classList.remove("hidden");
-  dom.generatedOutput.innerHTML = "Working on your request...";
+  if (dom.generatedOutput) {
+    dom.generatedOutput.classList.remove("hidden");
+    dom.generatedOutput.innerHTML = "Working on your request...";
+  }
   
   try {
     const data = await api("/api/jobs/action", {
@@ -1152,23 +1178,31 @@ async function handleParsedActionClick(event) {
     });
     if (data.document?.content_text) {
       const parsedJob = state.currentIntake?.parsed_job || {};
-      dom.generatedOutput.innerHTML = `Generated <strong>${escapeHtml(data.document.name)}</strong>. Opened editable preview for ${escapeHtml(parsedJob.company || "this job")}.`;
+      if(dom.generatedOutput) {
+        dom.generatedOutput.innerHTML = `Generated <strong>${escapeHtml(data.document.name)}</strong>. Opened editable preview for ${escapeHtml(parsedJob.company || "this job")}.`;
+      }
       openDocumentEditor(data.document, `Tailored for ${parsedJob.role || "the parsed role"} at ${parsedJob.company || "the target company"}.`);
     } else if (data.match_analysis) {
-      dom.generatedOutput.innerHTML = `
-        <strong>Resume match updated</strong>
-        <p class="muted">${escapeHtml(data.match_analysis.summary || "Resume comparison generated.")}</p>
-        <div class="chip-row">${(data.match_analysis.matched_skills || []).map(skill => `<span class="chip">${escapeHtml(skill)}</span>`).join("")}</div>
-      `;
+      if(dom.generatedOutput) {
+        dom.generatedOutput.innerHTML = `
+          <strong>Resume match updated</strong>
+          <p class="muted">${escapeHtml(data.match_analysis.summary || "Resume comparison generated.")}</p>
+          <div class="chip-row">${(data.match_analysis.matched_skills || []).map(skill => `<span class="chip">${escapeHtml(skill)}</span>`).join("")}</div>
+        `;
+      }
     } else if (data.job) {
-      dom.generatedOutput.innerHTML = `Saved <strong>${escapeHtml(data.job.company)}</strong> — ${escapeHtml(data.job.role)} as ${escapeHtml(data.job.status)}.`;
+      if(dom.generatedOutput) {
+        dom.generatedOutput.innerHTML = `Saved <strong>${escapeHtml(data.job.company)}</strong> — ${escapeHtml(data.job.role)} as ${escapeHtml(data.job.status)}.`;
+      }
     } else {
-      dom.generatedOutput.innerHTML = "Action saved.";
+      if(dom.generatedOutput) {
+        dom.generatedOutput.innerHTML = "Action saved.";
+      }
     }
     await Promise.all([loadDashboard(), loadJobs(), loadDocuments()]);
     showToast("Action completed");
   } catch (error) {
-    dom.generatedOutput.textContent = error.message;
+    if(dom.generatedOutput) dom.generatedOutput.textContent = error.message;
     showToast(error.message);
   }
 }
@@ -1224,14 +1258,14 @@ function attachEvents() {
   dom.jobsRefreshBtn?.addEventListener("click", () => Promise.all([loadJobs(), loadDashboard()]));
   dom.discoverJobsBtn?.addEventListener("click", handleDiscoverJobs);
   
-  const openAddJobModal = () => dom.addJobModal.classList.remove("hidden");
+  const openAddJobModal = () => { if(dom.addJobModal) dom.addJobModal.classList.remove("hidden"); };
   dom.openAddJobBtns.forEach(button => button?.addEventListener("click", openAddJobModal));
   
   const closeAllModals = () => {
-      dom.addJobModal.classList.add("hidden");
-      dom.parseJobModal.classList.add("hidden");
-      dom.jobDetailsModal.classList.add("hidden");
-      dom.documentEditorModal.classList.add("hidden");
+      if(dom.addJobModal) dom.addJobModal.classList.add("hidden");
+      if(dom.parseJobModal) dom.parseJobModal.classList.add("hidden");
+      if(dom.jobDetailsModal) dom.jobDetailsModal.classList.add("hidden");
+      if(dom.documentEditorModal) dom.documentEditorModal.classList.add("hidden");
   };
   
   document.querySelectorAll(".close-modal-btn").forEach(btn => btn.addEventListener("click", closeAllModals));
@@ -1242,7 +1276,6 @@ function attachEvents() {
   dom.parseJobBtn?.addEventListener("click", handleParseJob);
   dom.jobActions?.addEventListener("click", handleParsedActionClick);
   
-  // Edit Job Details Modal Events
   dom.editJobDetailsBtn?.addEventListener("click", () => toggleJobDetailsEditMode(true));
   dom.cancelEditJobBtn?.addEventListener("click", () => toggleJobDetailsEditMode(false));
   dom.jobDetailsEditForm?.addEventListener("submit", handleJobDetailsSave);
@@ -1257,8 +1290,8 @@ function attachEvents() {
   dom.downloadDocumentPdfBtn?.addEventListener("click", handleDocumentDownload);
   
   dom.analyzeResumeBtn?.addEventListener("click", handleResumeAnalyze);
-  dom.uploadResumeBtn?.addEventListener("click", () => dom.resumeUploadInput.click());
-  dom.replaceResumeBtn?.addEventListener("click", () => dom.resumeUploadInput.click());
+  dom.uploadResumeBtn?.addEventListener("click", () => dom.resumeUploadInput?.click());
+  dom.replaceResumeBtn?.addEventListener("click", () => dom.resumeUploadInput?.click());
   dom.resumeUploadInput?.addEventListener("change", handleResumeUpload);
   dom.saveResumeBtn?.addEventListener("click", handleResumeSave);
   dom.downloadResumeBtn?.addEventListener("click", handleResumeDownload);
@@ -1267,12 +1300,12 @@ function attachEvents() {
   dom.parseEmailBtn?.addEventListener("click", handleEmailParse);
   dom.recommendedJobsList?.addEventListener("click", handleRecommendedJobClick);
   
-  // Chat Widget Events
   dom.chatFab?.addEventListener("click", () => {
+    if(!dom.chatWindow) return;
     dom.chatWindow.classList.toggle("hidden");
     if (!dom.chatWindow.classList.contains("hidden")) dom.chatInput?.focus();
   });
-  dom.closeChat?.addEventListener("click", () => dom.chatWindow.classList.add("hidden"));
+  dom.closeChat?.addEventListener("click", () => dom.chatWindow?.classList.add("hidden"));
   dom.chatForm?.addEventListener("submit", handleChat);
   
   window.addEventListener("keydown", event => {
