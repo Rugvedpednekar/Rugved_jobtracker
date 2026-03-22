@@ -271,6 +271,23 @@
       pointer-events: auto;
     }
 
+    .mobile-only-topbar {
+      display: none !important;
+    }
+
+    /* Show hamburger on mobile */
+    @media (max-width: 900px) {
+      .mobile-only-topbar {
+        display: flex !important;
+        padding: 1rem;
+        background: var(--color-bg-app);
+        border: none;
+        position: sticky;
+        top: 0;
+        z-index: 38;
+      }
+    }
+
     .sidebar {
       width: var(--sidebar-width);
       min-width: var(--sidebar-width);
@@ -1138,6 +1155,12 @@
         </button>
       </div>
     </aside>
+
+    <div class="app-main">
+      <header class="topbar mobile-only-topbar">
+        <button id="mobile-nav-toggle" class="btn btn-ghost btn-icon-only" type="button" aria-label="Toggle navigation">
+          <i data-lucide="menu"></i>
+        </button>
       </header>
 
       <main class="layout">
@@ -1230,6 +1253,7 @@
               <h2>Jobs</h2>
             </div>
             <div class="inline-actions mobile-inline-actions">
+              <button id="sync-gmail-btn" class="btn btn-secondary"><i data-lucide="mail"></i> Sync Gmail</button>
               <button id="jobs-refresh-btn" class="btn btn-secondary"><i data-lucide="refresh-cw"></i> Refresh</button>
               <button class="btn btn-secondary" data-open-parse-modal type="button"><i data-lucide="wand-2"></i> Parse Link</button>
               <button class="btn btn-primary" data-open-add-job type="button"><i data-lucide="plus"></i> Add Job</button>
