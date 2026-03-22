@@ -1613,22 +1613,61 @@ def extract_resume_text_from_upload(upload: UploadFile) -> Dict[str, str]:
 def build_text_pdf(title: str, content_text: str) -> io.BytesIO:
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+    from reportlab.lib.pagesizes import letter
     import re
 
     buffer = io.BytesIO()
-    # Set standard professional resume margins (0.5 inch = 36 points)
+    
+    # Standard professional margins (0.5 inch = 36 points)
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     styles = getSampleStyleSheet()
 
-    # Create custom resume styles
-    resume_normal = ParagraphStyle('ResumeNormal', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14)
-    resume_heading = ParagraphStyle('ResumeHeading', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, spaceAfter=4, spaceBefore=12, textColor="#000000")
-    resume_name = ParagraphStyle('ResumeName', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=18, alignment=TA_CENTER, spaceAfter=12)
+    # --- Custom Resume Styles ---
+    # Base text
+    resume_normal = ParagraphStyle(
+        'ResumeNormal', 
+        parent=styles['Normal'], 
+        fontName='Helvetica', 
+        fontSize=10, 
+        leading=14
+    )
+    
+    # Section Headers (e.g., EXPERIENCE, EDUCATION)
+    resume_section_header = ParagraphStyle(
+        'ResumeSectionHeader', 
+        parent=styles['Heading2'], 
+        fontName='Helvetica-Bold', 
+        fontSize=11, 
+        spaceBefore=14, 
+        spaceAfter=4, 
+        textColor="#000000",
+        textTransform='uppercase'
+    )
+    
+    # The very top Name
+    resume_name = ParagraphStyle(
+        'ResumeName', 
+        parent=styles['Heading1'], 
+        fontName='Helvetica-Bold', 
+        fontSize=18, 
+        alignment=TA_CENTER, 
+        spaceAfter=6
+    )
+    
+    # The contact info below the name
+    resume_contact = ParagraphStyle(
+        'ResumeContact', 
+        parent=styles['Normal'], 
+        fontName='Helvetica', 
+        fontSize=10, 
+        alignment=TA_CENTER,
+        spaceAfter=12
+    )
 
     story = []
 
-    # Helper to convert Markdown **bold** to ReportLab <b>bold</b>
+    # Helper: Convert **bold** to <b>bold</b> and handle bullet points
     def format_line(line):
         line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
         if line.startswith('- '):
@@ -1636,26 +1675,60 @@ def build_text_pdf(title: str, content_text: str) -> io.BytesIO:
         return line
 
     lines = content_text.split('\n')
+    
+    # We will try to pull the first few lines out to act as the header (Name + Contact Info)
+    header_processed = False
+    contact_info = []
+
     for i, line in enumerate(lines):
         line = line.strip()
-        if not line:
-            # Add a small spacer for empty lines
-            story.append(Spacer(1, 4))
+        if not line or line == "---":
+            if not header_processed and len(story) > 0:
+                 story.append(Spacer(1, 4))
             continue
 
-        # Detect section headings (e.g., **Experience** on its own line)
-        if line.startswith('**') and line.endswith('**') and len(line.split()) < 5:
+        # Header Parsing Logic: 
+        # Assume the first line is the name, and the next 3-4 lines (before the first blank or "---") are contact info.
+        if not header_processed:
+            if i == 0:
+                 # First line is usually the name
+                 clean_name = line.replace('*', '')
+                 story.append(Paragraph(clean_name, resume_name))
+            elif "Summary" not in line and "Experience" not in line and len(line) < 100 and len(story) < 5:
+                 # Collect contact info lines
+                 contact_info.append(line.replace('*', ''))
+            else:
+                 # We've hit a section heading, dump the contact info and move on
+                 if contact_info:
+                     combined_contact = " | ".join(contact_info)
+                     story.append(Paragraph(combined_contact, resume_contact))
+                 header_processed = True
+            
+            # If we are still processing the header, don't drop down to standard parsing yet
+            if not header_processed:
+                continue
+
+        # Standard Body Parsing Logic
+        
+        # Detect Section Headings (e.g., "**Experience**" or "**Education**")
+        if line.startswith('**') and line.endswith('**') and len(line.split()) <= 4:
             clean_heading = line.replace('**', '').upper()
-            story.append(Paragraph(clean_heading, resume_heading))
+            story.append(Paragraph(clean_heading, resume_section_header))
+            # Add a subtle horizontal line under headings
+            story.append(Spacer(1, 2))
             continue
 
-        # Standard line
+        # Standard lines (Bullet points or text blocks)
         story.append(Paragraph(format_line(line), resume_normal))
+        
+        # Add a tiny bit of breathing room between items (but not between bullet points)
+        if not line.startswith('- '):
+             story.append(Spacer(1, 3))
 
-    # Build the PDF
     doc.build(story)
     buffer.seek(0)
     return buffer
+
 
 def fallback_tasks(parsed_job: Dict[str, Any], action: Optional[str] = None) -> List[Dict[str, Any]]:
     base = [
