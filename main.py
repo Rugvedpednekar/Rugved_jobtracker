@@ -1556,13 +1556,26 @@ def ai_match_resume(parsed_job: Dict[str, Any], resume_text: str, parsed_profile
 
 
 def ai_generate_tailored_resume(parsed_job: Dict[str, Any], resume_text: str, parsed_profile: Dict[str, Any]) -> str:
-    system_prompt = "You rewrite resumes into a tailored plain-text resume. Keep it concise, factual, ATS-friendly, and structured with sections."
+    system_prompt = (
+        "You are an expert executive resume writer. Rewrite the provided base resume to be heavily tailored for the target job. "
+        "Output ONLY the resume text. Do NOT wrap the response in markdown code blocks (like ```markdown). "
+        "STRICT FORMATTING RULES:\n"
+        "1. Line 1 MUST be the candidate's Name only.\n"
+        "2. Lines 2-4 MUST be contact info (Location, Email, Phone, Links).\n"
+        "3. Use exactly these section headers wrapped in double asterisks: **Summary**, **Experience**, **Education**, **Skills**, **Projects**.\n"
+        "4. Use standard hyphens (-) for bullet points.\n"
+        "5. DO NOT include a 'Keywords' section at the bottom under any circumstances.\n\n"
+        "TAILORING RULES:\n"
+        "Rewrite the **Summary** to position the candidate perfectly for this specific role. "
+        "Reorder and tweak the **Experience** and **Projects** bullet points to highlight skills mentioned in the job description."
+    )
     fallback = (
-        f"TARGET ROLE\n{parsed_job.get('role', '')} at {parsed_job.get('company', '')}\n\n"
-        f"PROFESSIONAL SUMMARY\nTailored toward {parsed_job.get('role', 'the target role')} with emphasis on {', '.join(parsed_job.get('skills', [])[:6]) or 'core matching skills'}.\n\n"
-        f"EXPERIENCE HIGHLIGHTS\n- Reorder your strongest accomplishments to match the role requirements.\n"
-        f"- Highlight measurable impact, ownership, and tools such as {', '.join(parsed_job.get('skills', [])[:5]) or 'relevant technologies'}.\n\n"
-        f"BASE RESUME\n{resume_text[:4000]}"
+        f"{parsed_profile.get('name', 'Rugved Pednekar')}\n"
+        f"Targeting: {parsed_job.get('role', '')} at {parsed_job.get('company', '')}\n\n"
+        f"**Summary**\nTailored toward {parsed_job.get('role', 'the target role')} with emphasis on {', '.join(parsed_job.get('skills', [])[:6]) or 'core matching skills'}.\n\n"
+        f"**Experience**\n- Reorder your strongest accomplishments to match the role requirements.\n"
+        f"- Highlight measurable impact and tools such as {', '.join(parsed_job.get('skills', [])[:5]) or 'relevant technologies'}.\n\n"
+        f"{resume_text[:4000]}"
     )
     try:
         return nova_converse(system_prompt, json.dumps({"job": parsed_job, "resume_text": resume_text[:12000], "parsed_profile": parsed_profile}), 0.35, 2400)
