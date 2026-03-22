@@ -966,6 +966,40 @@ async function handleResumeUpload(event) {
   }
 }
 
+// --- Mobile Menu Toggle Logic ---
+document.addEventListener("DOMContentLoaded", () => {
+  const mobileNavToggle = document.getElementById("mobile-nav-toggle");
+  const sidebar = document.getElementById("sidebar");
+  const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+  const navButtons = document.querySelectorAll(".nav-btn");
+
+  // 1. Open sidebar when hamburger is clicked
+  if (mobileNavToggle && sidebar && sidebarBackdrop) {
+    mobileNavToggle.addEventListener("click", () => {
+      sidebar.classList.add("mobile-open");
+      sidebarBackdrop.classList.add("active");
+    });
+  }
+
+  // 2. Close sidebar when clicking the dark backdrop
+  if (sidebarBackdrop && sidebar) {
+    sidebarBackdrop.addEventListener("click", () => {
+      sidebar.classList.remove("mobile-open");
+      sidebarBackdrop.classList.remove("active");
+    });
+  }
+
+  // 3. Auto-close the sidebar when you click a menu link (on mobile)
+  navButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (window.innerWidth <= 900 && sidebar && sidebarBackdrop) {
+        sidebar.classList.remove("mobile-open");
+        sidebarBackdrop.classList.remove("active");
+      }
+    });
+  });
+});
+
 async function handleResumeSave() {
   try {
     const data = await api("/api/resume/save", {
