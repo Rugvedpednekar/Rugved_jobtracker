@@ -1611,55 +1611,51 @@ def extract_resume_text_from_upload(upload: UploadFile) -> Dict[str, str]:
 
 
 def build_text_pdf(title: str, content_text: str) -> io.BytesIO:
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    import re
+
     buffer = io.BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    margin = 54
-    max_width = width - (margin * 2)
-    title_font = "Helvetica-Bold"
-    body_font = "Helvetica"
-    title_size = 16
-    body_size = 11
+    # Set standard professional resume margins (0.5 inch = 36 points)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
 
-    def wrap_line(text_value: str) -> List[str]:
-        words = text_value.split()
-        if not words:
-            return [""]
-        lines: List[str] = []
-        current = words[0]
-        for word in words[1:]:
-            trial = f"{current} {word}"
-            if stringWidth(trial, body_font, body_size) <= max_width:
-                current = trial
-            else:
-                lines.append(current)
-                current = word
-        lines.append(current)
-        return lines
+    # Create custom resume styles
+    resume_normal = ParagraphStyle('ResumeNormal', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14)
+    resume_heading = ParagraphStyle('ResumeHeading', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, spaceAfter=4, spaceBefore=12, textColor="#000000")
+    resume_name = ParagraphStyle('ResumeName', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=18, alignment=TA_CENTER, spaceAfter=12)
 
-    y = height - margin
-    pdf.setTitle(title)
-    pdf.setFont(title_font, title_size)
-    pdf.drawString(margin, y, title[:80])
-    y -= 28
-    pdf.setFont(body_font, body_size)
+    story = []
 
-    paragraphs = content_text.splitlines() or [""]
-    for paragraph in paragraphs:
-        wrapped = wrap_line(paragraph) if paragraph.strip() else [""]
-        for line in wrapped:
-            if y <= margin:
-                pdf.showPage()
-                y = height - margin
-                pdf.setFont(body_font, body_size)
-            pdf.drawString(margin, y, line)
-            y -= 16
-        y -= 4
+    # Helper to convert Markdown **bold** to ReportLab <b>bold</b>
+    def format_line(line):
+        line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
+        if line.startswith('- '):
+            line = '&bull; ' + line[2:]
+        return line
 
-    pdf.save()
+    lines = content_text.split('\n')
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if not line:
+            # Add a small spacer for empty lines
+            story.append(Spacer(1, 4))
+            continue
+
+        # Detect section headings (e.g., **Experience** on its own line)
+        if line.startswith('**') and line.endswith('**') and len(line.split()) < 5:
+            clean_heading = line.replace('**', '').upper()
+            story.append(Paragraph(clean_heading, resume_heading))
+            continue
+
+        # Standard line
+        story.append(Paragraph(format_line(line), resume_normal))
+
+    # Build the PDF
+    doc.build(story)
     buffer.seek(0)
     return buffer
-
 
 def fallback_tasks(parsed_job: Dict[str, Any], action: Optional[str] = None) -> List[Dict[str, Any]]:
     base = [
@@ -2128,6 +2124,11 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], use
 
     linked_job = None
     document = None
+    
+    # Clean up role and company strings to remove spaces for the filename
+    role_clean = recommended.role.replace(' ', '')
+    company_clean = recommended.company.replace(' ', '')
+    
     if action in {"apply", "save_to_wishlist"}:
         linked_job = JobService(db, user_id).create(JobCreate(
             company=recommended.company,
@@ -2149,7 +2150,7 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], use
     elif action == "generate_resume":
         content = ai_generate_tailored_resume(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE)
         document = DocumentService(db, user_id).upsert_text_document(
-            name=f"Tailored Resume - {recommended.company}",
+            name=f"Rugved({role_clean}_{company_clean})",
             doc_type="tailored_resume",
             content_text=content,
             metadata_json={"recommended_job_id": recommended.id, "source_url": recommended.link},
@@ -2157,7 +2158,7 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], use
     elif action == "generate_cover_letter":
         content = ai_generate_cover_letter(parsed_job, state.get("resume_text") or "", state.get("parsed_profile") or DEFAULT_PARSED_PROFILE, state.get("settings") or DEFAULT_SETTINGS)
         document = DocumentService(db, user_id).upsert_text_document(
-            name=f"Cover Letter - {recommended.company}",
+            name=f"Rugved_CL({role_clean}_{company_clean})",
             doc_type="generated_cover_letter",
             content_text=content,
             metadata_json={"recommended_job_id": recommended.id, "source_url": recommended.link},
@@ -2175,7 +2176,6 @@ def recommended_job_action(recommended_job_id: str, payload: Dict[str, str], use
         "match_analysis": match_analysis,
         "tasks": [],
     }
-
 
 @app.get("/api/tasks")
 def list_tasks(user: Dict[str, Any] = Depends(require_auth), db: Session = Depends(get_db)):
